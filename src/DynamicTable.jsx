@@ -87,6 +87,12 @@ export default function DynamicTable(props) {
   const selectedInScope = selectionRows.filter(row => selected.has(identify(row))).length;
   const allSelected = selectionRows.length > 0 && selectedInScope === selectionRows.length;
   const columnCount = headers.length + Number(hasActions) + Number(selectionEnabled);
+  const dataColumnWidths = [
+    ...headers.map(header => ({ key: `column-${header.field}`, width: layout.sizing[header.field] })),
+    ...(hasActions ? [{ key: 'row-actions', width: 160 }] : []),
+  ];
+  const columnWidths = selectionEnabled ? insertSelectionCell(dataColumnWidths,
+    { key: 'selection-column', width: 140 }, props.selectionColumnPosition) : dataColumnWidths;
   const sort = model.sorting[0];
 
   useEffect(() => {
@@ -135,7 +141,10 @@ export default function DynamicTable(props) {
             {props.tooltipFields?.[header.field] && <Tooltip title={props.tooltipFields[header.field].join(', ')}>
               <IconButton size="small" aria-label={labels.about(header.label)}><InfoIcon fontSize="small" /></IconButton>
             </Tooltip>}
-            {enableColumnFilters && header.filterable !== false && <TextField size="small" label={labels.filter(header.label)}
+            {enableColumnFilters && header.filterable !== false && <TextField size="small" variant="filled" label={labels.filter(header.label)}
+              sx={{ bgcolor: 'background.paper', color: 'text.primary', borderRadius: 1, mt: 1, width: '100%' }}
+              slotProps={{ inputLabel: { sx: { color: 'text.secondary', '&.Mui-focused': { color: 'text.primary' } } },
+                input: { sx: { color: 'text.primary', '&::after': { borderBottomColor: 'text.primary' } } } }}
               value={model.columnFilters[header.field] ?? ''} onChange={event => model.update({ page: 0,
                 columnFilters: { ...model.columnFilters, [header.field]: event.target.value } })} />}
           </Cell>),
@@ -180,17 +189,9 @@ export default function DynamicTable(props) {
     <TableContainer sx={{ maxHeight: props.maxHeight }}>
       <TableComponent {...slotProps.table} stickyHeader={props.stickyHeader} size={dense ? 'small' : 'medium'}
         sx={[...(Array.isArray(slotProps.table?.sx) ? slotProps.table.sx : [slotProps.table?.sx ?? {}]),
-          ...(resizing ? [{ tableLayout: 'fixed', width: headers.reduce((sum, header) => sum + layout.sizing[header.field], 0) + Number(selectionEnabled) * 140 + Number(hasActions) * 160 }] : [])]}
+          ...(resizing ? [{ tableLayout: 'fixed', width: columnWidths.reduce((sum, column) => sum + column.width, 0) }] : [])]}
         aria-label={props['aria-label'] ?? (pageTitle || labels.table)} aria-busy={loading}>
-        {resizing && <colgroup>
-          {(selectionEnabled ? insertSelectionCell([
-            ...headers.map(header => <col key={header.field} style={{ width: layout.sizing[header.field] }} />),
-            ...(hasActions ? [<col key="row-actions" style={{ width: 160 }} />] : []),
-          ], <col key="selection-column" style={{ width: 140 }} />, props.selectionColumnPosition) : [
-            ...headers.map(header => <col key={header.field} style={{ width: layout.sizing[header.field] }} />),
-            ...(hasActions ? [<col key="row-actions" style={{ width: 160 }} />] : []),
-          ])}
-        </colgroup>}
+        {resizing && <colgroup>{columnWidths.map(column => <col key={column.key} style={{ width: column.width }} />)}</colgroup>}
         <Head {...slotProps.header}><Row>
           {selectionEnabled ? insertSelectionCell(headerCells, selectionHeader, props.selectionColumnPosition) : headerCells}
         </Row></Head>

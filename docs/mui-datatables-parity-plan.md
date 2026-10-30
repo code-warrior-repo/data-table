@@ -30,8 +30,8 @@ Sources:
 | Search | Toggleable text search, per-column opt-out | Controlled query/open state, always-open, case-sensitive/custom predicate, debounce helper, placeholder/input props and lifecycle events |
 | Filtering | Inline text filters and custom predicate | Dialog/popover, checkbox/dropdown/multiselect/custom inputs, array any/all matching, custom/sorted choices, draft/apply/reset, chips and callbacks |
 | Visibility | Missing | Visible/hidden/excluded columns, immutable visibility, chooser, per-column chooser eligibility and events |
-| Column order | Missing | Controlled order, pointer/keyboard reorder, locked columns, configurable animation and events |
-| Column sizing | Static width | Resizers, min/max bounds, controlled widths, keyboard support and pointer cleanup |
+| Column order | Controlled/initial order, drag/keyboard/menu movement, locked slots and callbacks | Optional animation and visibility integration |
+| Column sizing | Controlled/initial widths, pointer/keyboard resizers, bounds and capture cleanup | Optional fit-to-content sizing and visibility integration |
 | Selection | Email-specific loaded-data selection | General none/single/multiple selection, eligibility, row-click, checkbox/header visibility, range selection, controlled IDs and select toolbar |
 | Bulk delete | Per-row delete only | Selected-row callback with cancellation; consumer-owned backend mutation and local-data update |
 | Expansion | Missing | Controlled IDs, eligibility, expand-all/header controls, row-click trigger, custom detail renderer and events |

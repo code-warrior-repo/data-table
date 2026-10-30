@@ -1,5 +1,24 @@
 export const examples = [
   {
+    "slug": "client-pagination-all-features",
+    "title": "Client pagination: complete example",
+    "group": "Complete examples",
+    "description": "Combine local queries, controlled layout, row/bulk actions, every export format, themes and state previews.",
+    "supportingFiles": [
+      "full-feature-shared.jsx"
+    ]
+  },
+  {
+    "slug": "server-pagination-all-features",
+    "title": "Server pagination: complete example",
+    "group": "Complete examples",
+    "description": "Combine Spring paging and full-result export, cross-page selection, mock mutations, retries and all presentation controls.",
+    "supportingFiles": [
+      "full-feature-shared.jsx",
+      "full-feature-server.js"
+    ]
+  },
+  {
     "slug": "basic",
     "title": "Basic table",
     "group": "Data",

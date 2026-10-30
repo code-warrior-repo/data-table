@@ -6,6 +6,7 @@ A modular JavaScript React table built with Material UI, with local or caller-ma
 
 - [Setup and quick start](#setup-and-quick-start)
 - [Individual examples](#individual-examples)
+- [Complete client/server pagination examples](#complete-clientserver-pagination-examples)
 - [Public exports](#public-exports)
 - [DynamicTable parameters](#dynamictable-parameters)
 - [Column parameters](#column-parameters)
@@ -74,7 +75,7 @@ export default function Customers() {
 
 ## Individual examples
 
-The [example catalog](examples/nextjs-demo/README.md) contains **66 standalone examples**, each with its own source file, route, description and expandable source view. Remote examples use a simulated backend; email examples only preview recipients.
+The [example catalog](examples/nextjs-demo/README.md) contains **71 examples**, each with its own source file, route, description and expandable source view. Remote examples use a simulated backend; email examples only preview recipients.
 
 ```sh
 npm run build
@@ -83,6 +84,21 @@ npm run dev --prefix examples/nextjs-demo
 ```
 
 Open [the local catalog](http://localhost:3000). Validate its production build with `npm run build --prefix examples/nextjs-demo`.
+
+## Complete client/server pagination examples
+
+Run the Next demo using the instructions above, then open either integrated example:
+
+| Mode | Live route | Source |
+|---|---|---|
+| Client pagination | [Complete client demo](http://localhost:3000/examples/client-pagination-all-features) | [client-pagination-all-features.jsx](examples/nextjs-demo/examples/client-pagination-all-features.jsx) |
+| Server pagination | [Complete server demo](http://localhost:3000/examples/server-pagination-all-features) | [server-pagination-all-features.jsx](examples/nextjs-demo/examples/server-pagination-all-features.jsx) |
+
+Both combine controlled queries, text search, per-column filters (minimum score/text matching), single/multi-column sorting, first/last/custom checkbox position, selection across pages, generic bulk remove/email-preview/clear actions, dynamic view/status-edit/clone/delete row menus, controlled column order/widths, drag/keyboard/menu movement, resizing, sticky headers, density, green/default and other themes, fullscreen, toolbar left/right/split placement, a custom reset control, header tooltips, nested/composite/typed columns, rendered status/currency values and all five built-in export formats. Exports include all matching rows and reflect the displayed column order; currency exports retain raw numbers. Layout changes preserve queries and selection.
+
+Client mode keeps the full dataset in React state and offers `All` rows plus loading/error/empty previews. Server mode holds only the current page, cancels stale reads, and uses `createSpringDataSource` + `toSpringRequest` from `src/spring.js` for pagination and `fetchAllSpringRows` for bounded complete-result exports with progress/cancellation. Its per-instance simulated backend applies the same filters and stable sorting, performs mock mutations, resolves selected IDs from unloaded pages, and demonstrates failed-request/retry and restore flows. Server sizes are positive/bounded; `All` is offered only in client mode.
+
+The [shared example UI/schema](examples/nextjs-demo/examples/full-feature-shared.jsx) and [stateful mock backend](examples/nextjs-demo/examples/full-feature-server.js) have separate source panels on the demo pages. All rows and mutations are synthetic, and email only previews recipients. Replace the backend/fetcher with your authenticated API and mutation endpoints when integrating. The focused examples remain available for alternative APIs such as legacy action flags, endpoint exports, custom slots and localization; mutually exclusive API alternatives are not enabled together in these combined demos.
 
 ## Public exports
 
@@ -846,7 +862,7 @@ The helper's `signal` and `onProgress` can be forwarded directly from the built-
 - Date-only `YYYY-MM-DD` values are formatted using local calendar components; timestamp/Date display follows the runtime's local timezone. Invalid or mixed-type values need application-specific handling; this is not a range/date-validation API.
 - Legacy action props and `enableSearch` remain supported. New action UI belongs in `renderRowActions` or display columns. Native renderer `row` is the original object, not `{ original: ... }`.
 - Internal `RowActions`, export menus, styled components, themes, date/path utilities and pagination controls are not public package exports. Import only the names listed in [public exports](#public-exports).
-- The package now exposes controlled query state, declaration files, helper subpaths, selection ownership, export jobs, slots and localization. Column visibility/reordering/resizing, grouped headers, trees, persistence, print controls and virtualization remain future scope. See the [parity plan](docs/mui-datatables-parity-plan.md) and [tablekit review](docs/mui-tablekit-review.md) for proposed work; those are not implemented API parameters.
+- The package now exposes controlled query state, declaration files, helper subpaths, selection ownership, export jobs, slots and localization. Column visibility, grouped headers, trees, persistence, print controls and virtualization remain future scope. See the [parity plan](docs/mui-datatables-parity-plan.md) and [tablekit review](docs/mui-tablekit-review.md) for proposed work; those are not implemented API parameters.
 
 The default table theme is green (`#008000`), with contrasting header text and alternating row shading. Selecting another theme updates the header, accents, table surface and pagination together. Application typography and component overrides remain effective; explicit header overrides can take precedence over preset colors. Pagination keeps accessible labels and theme-based foreground/background colors.
 

@@ -887,6 +887,15 @@ function DynamicTable(props) {
   const selectedInScope = selectionRows.filter((row) => selected.has(identify(row))).length;
   const allSelected = selectionRows.length > 0 && selectedInScope === selectionRows.length;
   const columnCount = headers.length + Number(hasActions) + Number(selectionEnabled);
+  const dataColumnWidths = [
+    ...headers.map((header) => ({ key: `column-${header.field}`, width: layout.sizing[header.field] })),
+    ...hasActions ? [{ key: "row-actions", width: 160 }] : []
+  ];
+  const columnWidths = selectionEnabled ? insertSelectionCell(
+    dataColumnWidths,
+    { key: "selection-column", width: 140 },
+    props.selectionColumnPosition
+  ) : dataColumnWidths;
   const sort = model.sorting[0];
   useEffect2(() => {
     const change = () => setFullscreen(document.fullscreenElement === ref.current);
@@ -974,7 +983,13 @@ function DynamicTable(props) {
         TextField2,
         {
           size: "small",
+          variant: "filled",
           label: labels.filter(header.label),
+          sx: { bgcolor: "background.paper", color: "text.primary", borderRadius: 1, mt: 1, width: "100%" },
+          slotProps: {
+            inputLabel: { sx: { color: "text.secondary", "&.Mui-focused": { color: "text.primary" } } },
+            input: { sx: { color: "text.primary", "&::after": { borderBottomColor: "text.primary" } } }
+          },
           value: model.columnFilters[header.field] ?? "",
           onChange: (event) => model.update({
             page: 0,
@@ -1068,18 +1083,12 @@ function DynamicTable(props) {
       size: dense ? "small" : "medium",
       sx: [
         ...Array.isArray(slotProps.table?.sx) ? slotProps.table.sx : [slotProps.table?.sx ?? {}],
-        ...resizing ? [{ tableLayout: "fixed", width: headers.reduce((sum, header) => sum + layout.sizing[header.field], 0) + Number(selectionEnabled) * 140 + Number(hasActions) * 160 }] : []
+        ...resizing ? [{ tableLayout: "fixed", width: columnWidths.reduce((sum, column) => sum + column.width, 0) }] : []
       ],
       "aria-label": props["aria-label"] ?? (pageTitle || labels.table),
       "aria-busy": loading
     },
-    resizing && /* @__PURE__ */ React8.createElement("colgroup", null, selectionEnabled ? insertSelectionCell([
-      ...headers.map((header) => /* @__PURE__ */ React8.createElement("col", { key: header.field, style: { width: layout.sizing[header.field] } })),
-      ...hasActions ? [/* @__PURE__ */ React8.createElement("col", { key: "row-actions", style: { width: 160 } })] : []
-    ], /* @__PURE__ */ React8.createElement("col", { key: "selection-column", style: { width: 140 } }), props.selectionColumnPosition) : [
-      ...headers.map((header) => /* @__PURE__ */ React8.createElement("col", { key: header.field, style: { width: layout.sizing[header.field] } })),
-      ...hasActions ? [/* @__PURE__ */ React8.createElement("col", { key: "row-actions", style: { width: 160 } })] : []
-    ]),
+    resizing && /* @__PURE__ */ React8.createElement("colgroup", null, columnWidths.map((column) => /* @__PURE__ */ React8.createElement("col", { key: column.key, style: { width: column.width } }))),
     /* @__PURE__ */ React8.createElement(Head, { ...slotProps.header }, /* @__PURE__ */ React8.createElement(Row, null, selectionEnabled ? insertSelectionCell(headerCells, selectionHeader, props.selectionColumnPosition) : headerCells)),
     /* @__PURE__ */ React8.createElement(Body, { ...slotProps.body }, !error && model.rows.map((row, index) => {
       const rowId = identify(row);

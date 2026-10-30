@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 
 test('keyboard search, reset and accessible table', async ({ page }) => {
@@ -156,4 +157,115 @@ test('columns resize with actual pointer and keyboard controls and parent reset'
   await page.getByRole('button', { name: 'Reset column layout', exact: true }).click();
   await expect(page.getByRole('separator', { name: 'Resize Name', exact: true })).toHaveAttribute('aria-valuenow', '220');
   await expect(page.getByRole('status')).toHaveText('Column order: name, status, score. Status has a fixed position and width.');
+});
+
+async function downloadFile(page, format) {
+  await page.getByRole('button', { name: 'Export menu', exact: true }).click();
+  await expect(page.getByRole('menuitem')).toHaveCount(5);
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('menuitem', { name: format.toUpperCase(), exact: true }).click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toMatch(new RegExp(`\\.${format}$`));
+  return readFile(await download.path());
+}
+async function downloadCsv(page) { return (await downloadFile(page, 'csv')).toString('utf8'); }
+
+test('complete client pagination combines queries, layout, actions and full matching export', async ({ page }) => {
+  await page.goto('/examples/client-pagination-all-features');
+  const table = page.getByRole('table');
+  await expect(table.getByRole('cell', { name: 'Ada Lovelace', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Go to next page' }).click();
+  await expect(table.getByRole('cell', { name: 'Katherine Johnson', exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Filter Score', exact: true }).fill('95');
+  await expect(page.getByText('1–2 of 2', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Reset query and layout', exact: true }).click();
+  await page.getByRole('button', { name: 'Move Name', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(table.locator('th[data-column-field]').first()).toHaveAttribute('data-column-field', 'status');
+  await page.getByRole('separator', { name: 'Resize Name', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('separator', { name: 'Resize Name', exact: true })).toHaveAttribute('aria-valuenow', '250');
+  await page.getByRole('button', { name: 'Dense padding', exact: true }).click();
+  await expect(table.getByRole('cell', { name: 'Ada Lovelace', exact: true })).toHaveClass(/MuiTableCell-sizeSmall/);
+  await page.getByRole('button', { name: 'theme selector', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Grey', exact: true }).click();
+  await expect(table.locator('th[data-column-field]').first()).toHaveCSS('background-color', 'rgb(158, 158, 158)');
+  await page.getByRole('combobox', { name: 'Checkbox position', exact: true }).click();
+  await page.getByRole('option', { name: 'Last', exact: true }).click();
+  await expect(table.getByRole('row').first().getByRole('columnheader').last().getByRole('checkbox')).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Select row 1', exact: true }).check();
+  await page.getByRole('button', { name: 'Email selected', exact: true }).click();
+  await expect(page.getByTestId('feature-feedback')).toHaveText('Email preview: ada@example.test');
+  await page.getByRole('button', { name: 'Actions for Ada', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'View', exact: true }).click();
+  await expect(page.getByTestId('feature-feedback')).toHaveText('Viewing Ada Lovelace: ada@example.test');
+  const csv = await downloadCsv(page);
+  expect(csv.trim().split(/\r?\n/)).toHaveLength(9);
+  expect(csv).toContain('Annie Easley');
+  expect(csv.replace(/^\uFEFF/, '')).toMatch(/^Status,Name,/);
+  await expect(page.getByTestId('feature-feedback')).toHaveText('Exported 8 matching rows as CSV.');
+  const json = JSON.parse((await downloadFile(page, 'json')).toString('utf8'));
+  expect(json).toHaveLength(8);
+  expect(json[0]).toMatchObject({ name: 'Ada Lovelace', amount: 125.5 });
+  expect((await downloadFile(page, 'txt')).toString('utf8')).toContain('Annie Easley');
+  const workbook = new (await import('exceljs')).default.Workbook();
+  await workbook.xlsx.load(await downloadFile(page, 'xlsx'));
+  expect(workbook.worksheets[0].rowCount).toBe(9);
+  expect((await downloadFile(page, 'pdf')).subarray(0, 5).toString('utf8')).toBe('%PDF-');
+  const result = await new AxeBuilder({ page }).include('main').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  expect(result.violations).toEqual([]);
+});
+
+test('complete server pagination keeps cross-page IDs and exports the filtered Spring result', async ({ page }) => {
+  await page.goto('/examples/server-pagination-all-features');
+  const table = page.getByRole('table');
+  await expect(table.getByRole('cell', { name: 'Ada Lovelace', exact: true })).toBeVisible();
+  const reads = await page.getByTestId('server-request-count').textContent();
+  await page.getByRole('button', { name: 'Move Name', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByTestId('server-request-count')).toHaveText(reads);
+  await page.getByRole('checkbox', { name: 'Select row 1', exact: true }).check();
+  await page.getByRole('button', { name: 'Go to next page' }).click();
+  await expect(table.getByRole('cell', { name: 'Katherine Johnson', exact: true })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Select row 1', exact: true }).check();
+  await page.getByRole('button', { name: 'Email selected', exact: true }).click();
+  await expect(page.getByTestId('feature-feedback')).toHaveText('Email preview: ada@example.test, katherine@example.test');
+  await page.getByRole('button', { name: 'Remove selected', exact: true }).click();
+  await expect(page.getByText('1–3 of 6', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Restore data', exact: true }).click();
+  await expect(table.getByRole('cell', { name: 'Ada Lovelace', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Actions for Ada', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Mark pending', exact: true }).click();
+  await expect(table.getByRole('row').filter({ hasText: 'Ada Lovelace' }).getByText('Pending', { exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Filter Score', exact: true }).fill('90');
+  await expect(page.getByText('1–3 of 5', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Multi-column sort', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Score', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Score', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(table.getByRole('row').nth(1).getByText('Katherine Johnson', { exact: true })).toBeVisible();
+  const csv = await downloadCsv(page);
+  expect(csv.trim().split(/\r?\n/)).toHaveLength(6);
+  expect(csv).toContain('Dorothy Vaughan');
+  await expect(page.getByTestId('feature-feedback')).toHaveText('Exported 5 matching rows as CSV.');
+  await page.getByRole('button', { name: 'Fail next request', exact: true }).click();
+  await expect(page.getByText('Table request failed (503)', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Retry request', exact: true }).click();
+  await expect(table.getByRole('row').nth(1).getByText('Katherine Johnson', { exact: true })).toBeVisible();
+  const result = await new AxeBuilder({ page }).include('main').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  expect(result.violations).toEqual([]);
+});
+
+test('complete header filters and custom cells follow every selected theme accessibly', async ({ page }) => {
+  await page.goto('/examples/client-pagination-all-features');
+  const score = page.getByRole('textbox', { name: 'Filter Score', exact: true });
+  await score.fill('80');
+  for (const name of ['Default', 'Grey', 'Blue', 'Light', 'Dark']) {
+    await page.getByRole('button', { name: 'theme selector', exact: true }).click();
+    await page.getByRole('menuitem', { name, exact: true }).click();
+    await score.focus();
+    if (name === 'Dark') await expect(page.getByRole('table').locator('.MuiChip-colorSuccess').first()).toHaveCSS('background-color', 'rgb(102, 187, 106)');
+    const result = await new AxeBuilder({ page }).include('.MuiTableContainer-root').withRules(['color-contrast', 'label', 'aria-input-field-name']).analyze();
+    expect(result.violations, name).toEqual([]);
+  }
 });

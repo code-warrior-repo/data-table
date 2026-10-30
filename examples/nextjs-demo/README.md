@@ -1,6 +1,17 @@
 # Individual DynamicTable examples
 
-The catalog contains **69 separate examples**, one source file and route per implemented capability. It uses the public package API. Planned tree, grouping, persistence and advanced filter-dialog features are not part of the current implementation.
+The catalog contains **71 examples**: two complete pagination demos plus focused feature examples, each with its own route and source. It uses the public package API. Planned tree, grouping, persistence and advanced filter-dialog features are not part of the current implementation.
+
+## Complete examples
+
+| Example | Live demo | Source |
+|---|---|---|
+| Client pagination with all compatible features | [Client demo](http://localhost:3000/examples/client-pagination-all-features) | [client-pagination-all-features.jsx](examples/client-pagination-all-features.jsx) |
+| Server pagination with all compatible features | [Server demo](http://localhost:3000/examples/server-pagination-all-features) | [server-pagination-all-features.jsx](examples/server-pagination-all-features.jsx) |
+
+Both include query controls, typed/computed/rendered columns, cross-page selection, working row/bulk actions, all export formats, column order/resize controls, checkbox/toolbar positioning, sticky headers, density, themes, fullscreen and reset/restore controls. The client demo adds `All` and loading/error/empty previews. The server demo uses the real library Spring helpers for page requests and complete-result export, with stale-request cancellation, stable sorting, progress/cancellation, failure/retry, and an isolated stateful mock backend. Server bulk operations use IDs and resolve records on the backend, including unloaded pages.
+
+Shared schema, settings, menu and bulk UI: [full-feature-shared.jsx](examples/full-feature-shared.jsx). Mock Spring read/mutation endpoints: [full-feature-server.js](examples/full-feature-server.js). Both are viewable as supporting source panels. Replace this mock transport/mutation layer with your API; no real email is sent. Focused examples cover alternative APIs (legacy flags, custom slots, localization, endpoint exports) separately.
 
 ## Run
 
@@ -16,6 +27,8 @@ npm run dev --prefix examples/nextjs-demo
 ```
 
 Open [the example catalog](http://localhost:3000). Each example has its own `/examples/<slug>` page, description, live controls and expandable source. `/spring` remains an alias for the Spring adapter example.
+
+The demo uses [Turbopack resolution aliases](https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#resolving-aliases) to share one root MUI/Emotion installation with the locally linked library, so custom renderers and table controls use the same theme context.
 
 The demo imports the library's built `dist` through the local package dependency. Rebuild the root library after changing its source. Restart the demo if an installed local package or cached build needs refreshing.
 
@@ -167,6 +180,10 @@ Keep each example focused. Shared data and mock transport can be reused, while t
 - [Toolbar right](examples/toolbar-right.jsx) — `/examples/toolbar-right`
 - [Split toolbar](examples/toolbar-split.jsx) — `/examples/toolbar-split`
 
+## Column movement and resizing
+
+| Example | Source | Purpose |
+|---|---|---|
 | [Column reordering](http://localhost:3000/examples/column-reordering) | [column-reordering.jsx](examples/column-reordering.jsx) | Move columns by drag/drop, keyboard or menu; utility columns retain their positions. |
 | [Column resizing](http://localhost:3000/examples/column-resizing) | [column-resizing.jsx](examples/column-resizing.jsx) | Resize columns with pointer or keyboard controls and per-column width limits. |
 | [Controlled column layout](http://localhost:3000/examples/controlled-column-layout) | [controlled-column-layout.jsx](examples/controlled-column-layout.jsx) | Control order and pixel widths in the parent, lock a column and reset the layout. |

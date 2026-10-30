@@ -1,4 +1,6 @@
 'use client';
+import FullClientExample from './client-pagination-all-features';
+import FullServerExample from './server-pagination-all-features';
 import ColumnLayoutExample0 from './column-reordering';
 import ColumnLayoutExample1 from './column-resizing';
 import ColumnLayoutExample2 from './controlled-column-layout';
@@ -70,6 +72,8 @@ import Example51 from './blob-builders';
 import Example52 from './serialization';
 
 export const exampleComponents = {
+  'client-pagination-all-features': FullClientExample,
+  'server-pagination-all-features': FullServerExample,
   'column-reordering': ColumnLayoutExample0,
   'column-resizing': ColumnLayoutExample1,
   'controlled-column-layout': ColumnLayoutExample2,

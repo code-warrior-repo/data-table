@@ -62,3 +62,17 @@ Run the package smoke test after building. Browser tests start their own localho
 Selection now feeds caller-owned `renderBulkActions`, with selected IDs, selected loaded rows, unloaded selected IDs, disabled state and explicit clearing. The legacy email button remains compatible and is replaced when a generic renderer is supplied. Checkbox position is first by default, with last/numeric placement available; toolbar controls default left with global and individual side overrides. Repositioning preserves active controls/jobs.
 
 The catalog now has 66 individual examples. Layout/bulk interaction tests, strict declaration checks, the fresh-package consumer and production demo build pass. Five Chromium tests pass, including actual first-column bulk selection and split-toolbar geometry. Existing release gates above remain unchanged.
+
+## Column movement and sizing update
+
+Column order and pixel widths now have independent controlled/initial props and callbacks. Header move buttons support native drag/drop, keyboard arrows and menus; resize separators support pointer capture, keyboard steps and min/max bounds. Per-column locks keep utility and fixed columns aligned. Layout state stays outside query processing; it preserves selection and sorting, and exports follow the displayed order. The green default and pagination accessibility fixes remain in place.
+
+Verification: lint, strict declaration checks, 187 unit/component/example tests, library build and production demo build pass (69 individual examples). All 10 Chromium checks pass, including actual column drag/drop, pointer resizing, controlled reset and automated accessibility scans. Focused layout/selection tests also passed after consolidating column widths. Other browser engines and manual screen-reader/touch-device qualification remain outside this local verification.
+
+## Complete pagination examples update
+
+The catalog now includes 71 examples, with integrated client and Spring server demos combining compatible end-user features. Both demonstrate controlled queries and column layout, generic cross-page selection/actions, dynamic row menus, header filters/tooltips, typed and rendered columns, all five export formats, theme/density/fullscreen controls and positioning. Client mode adds All and loading/error/empty previews; server mode uses the real Spring adapter and bounded complete-result export, stale-read cancellation, isolated mock mutations and failure/retry. Supporting UI/backend sources are included on each demo page.
+
+Combined checks exposed filter-label contrast on colored headers and duplicate MUI/Emotion contexts in the linked demo. Header filters now have paper-colored surfaces and readable focus styles; demo resolution aliases share a single peer installation so caller-rendered cells follow the selected theme. Application example buttons inherit readable text colors, and warning chips use contrasting text.
+
+Verification: 196 unit/component/example tests, lint, strict declaration checks, library build and demo production build pass (75 generated pages, including 71 example routes). All 13 Chromium tests pass. New browser checks download all five formats, inspect complete CSV/JSON/XLSX data and PDF signature, exercise client queries/layout/actions and server cross-page bulk operations/filtering/sorting/retry, and scan focused filters/custom cells in every built-in theme. Other browser engines and manual device/screen-reader qualification remain outside this local verification.

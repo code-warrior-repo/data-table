@@ -2,6 +2,13 @@
 
 ## Unreleased — production hardening
 
+### Complete pagination examples
+
+- Added complete client/server pagination demos combining query controls, generic actions, layout controls, typed columns and all export formats.
+- Server demo uses the Spring adapter for paging and bounded full-result export, with cross-page IDs, isolated mock mutations, cancelled stale reads and error/retry flows.
+- Corrected filter-input contrast on colored headers and shared MUI/Emotion contexts in the linked demo.
+- Added supporting source panels, quick navigation links and an integrated feature guide; focused examples remain available.
+
 ### Column layout
 
 - Added opt-in column movement by drag/drop, keyboard and menu, and pointer/keyboard resizing with per-column limits.

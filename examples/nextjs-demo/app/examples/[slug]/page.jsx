@@ -16,15 +16,20 @@ export default async function Page({ params }) {
   const example = examples.find(item => item.slug === slug);
   if (!example) notFound();
   // Only catalogued filenames are read. The source is included in the statically generated page.
-  const source = await readFile(path.join(process.cwd(), 'examples', `${example.slug}.jsx`), 'utf8');
+  const files = [`${example.slug}.jsx`, ...(example.supportingFiles ?? [])];
+  const sources = await Promise.all(files.map(async filename => {
+    if (path.basename(filename) !== filename) throw new Error('Example sources must be local filenames.');
+    return { filename, source: await readFile(path.join(process.cwd(), 'examples', filename), 'utf8') };
+  }));
   return <main>
     <Link href="/">All examples</Link>
     <h1>{example.title}</h1>
     <p>{example.description}</p>
     <ExampleRunner slug={slug} />
-    <details style={{ marginTop: 24 }}><summary>Example source</summary>
+    {sources.map(({ filename, source }, index) => <details key={filename} style={{ marginTop: 24 }}>
+      <summary>{index === 0 ? 'Example source' : `Supporting source: ${filename}`}</summary>
       <pre style={{ overflowX: 'auto', padding: 16, border: '1px solid', borderRadius: 4 }}><code>{source}</code></pre>
-      <p>Shared synthetic rows and column definitions are in <code>examples/shared.js</code>. Remote examples use <code>examples/mockServer.js</code>.</p>
-    </details>
+    </details>)}
+    <p>Shared synthetic records are in <code>examples/shared.js</code>. Complete examples include their shared UI/backend sources above; focused remote examples use <code>examples/mockServer.js</code>.</p>
   </main>;
 }
