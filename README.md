@@ -618,3 +618,4 @@ Import `createSpringDataSource` from the package. The [Spring example](examples/
 - The package does not currently expose a complete controlled-query `state` prop, typed declarations, selection beyond email, column visibility/reordering/resizing, grouped headers, trees, persistence, print controls or virtualization. See the [parity plan](docs/mui-datatables-parity-plan.md) and [tablekit review](docs/mui-tablekit-review.md) for proposed work; those are not implemented API parameters.
 
 The implementation separates column access (`src/core/columns.js`), row processing (`src/core/rows.js`), state (`src/hooks/useTableModel.js`), MUI composition (`src/DynamicTable.jsx`), legacy compatibility (`src/compat/legacyActions.jsx`), serialization (`src/exports.js`) and backend adaptation (`src/spring.js`). This repository is a library; the Next.js application is an optional example catalog.
+# data-table
