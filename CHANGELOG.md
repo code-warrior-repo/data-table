@@ -2,6 +2,11 @@
 
 ## Unreleased — production hardening
 
+### Theme selection
+
+- Made Grey/Blue presets visibly tint the table surface and added a standard MUI Dark preset. Default still follows the application theme.
+- Theme changes preserve mounted controls and application typography/component overrides; the menu now marks the active choice.
+
 ### Generic selection and toolbar placement
 
 - Added `renderBulkActions` for caller-owned remove/delete/email/custom actions, with selected IDs, loaded rows, unloaded IDs and a clear-selection callback.

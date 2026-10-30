@@ -294,7 +294,7 @@ The menu exports matching, sorted rows across all client pages. It ignores email
 | `maxHeight` | `number or CSS string` | unset | Maximum scrolling body-container height. |
 | `enableDensePadding` | `boolean` | `false` | Show a density toggle; initial row size is medium. |
 | `enableFullScreenOption` | `boolean` | `false` | Show browser fullscreen controls. Unsupported/rejected fullscreen shows feedback. |
-| `enableThemes` | `boolean` | `false` | Show the library theme selector: `default`, `grey`, `blue`, `light`; initial selection is `default`, which inherits the parent theme (standard MUI when none is supplied). Other selections opt into a preset. |
+| `enableThemes` | `boolean` | `false` | Show the library theme selector: `default`, `grey`, `blue`, `light`, `dark`; initial selection is `default`, which inherits the parent theme (standard MUI when none is supplied). Grey/Blue tint the table surface; Light/Dark use standard MUI palettes. Presets apply to this table and retain application typography and component overrides. Explicit overrides may take precedence over preset colors. |
 | `tooltipFields` | `Record<field, string[]>` | no tooltips | Header information buttons; array items are joined with commas. |
 | `renderToolbar` | `(context) => ReactNode` | unset | Append controls/content to the existing toolbar. Does not replace the default toolbar. |
 

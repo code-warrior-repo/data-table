@@ -37,6 +37,41 @@ describe('default Material UI appearance', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Default' }));
     expect(screen.getByTestId('theme-primary')).toHaveTextContent('#7b1fa2');
   });
+  it('changes the table surface visibly and marks the active preset', () => {
+    render(<DynamicTable headers={headers} data={data} enableThemes slotProps={{ root: { 'data-testid': 'surface' } }} />);
+    const choose = name => {
+      fireEvent.click(screen.getByLabelText('theme selector'));
+      fireEvent.click(screen.getByRole('menuitem', { name, exact: true }));
+    };
+    expect(getComputedStyle(screen.getByTestId('surface')).backgroundColor).toBe('rgb(255, 255, 255)');
+    choose('Grey');
+    expect(getComputedStyle(screen.getByTestId('surface')).backgroundColor).toBe('rgb(245, 245, 245)');
+    choose('Blue');
+    expect(getComputedStyle(screen.getByTestId('surface')).backgroundColor).toBe('rgb(240, 247, 255)');
+    choose('Dark');
+    expect(getComputedStyle(screen.getByTestId('surface')).backgroundColor).toBe('rgb(18, 18, 18)');
+    expect(getComputedStyle(screen.getByTestId('surface')).color).toBe('rgb(255, 255, 255)');
+    fireEvent.click(screen.getByLabelText('theme selector'));
+    expect(screen.getByRole('menuitem', { name: 'Dark', exact: true })).toHaveAttribute('aria-current', 'true');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Light', exact: true }));
+    expect(getComputedStyle(screen.getByTestId('surface')).backgroundColor).toBe('rgb(255, 255, 255)');
+  });
+  it('preserves control instances and application overrides across theme changes', () => {
+    const applicationTheme = createTheme({ typography: { fontFamily: 'monospace' },
+      components: { MuiTableCell: { styleOverrides: { head: { backgroundColor: 'rgb(12, 34, 56)' } } } } });
+    render(<ThemeProvider theme={applicationTheme}><DynamicTable headers={headers} data={data} enableThemes
+      renderToolbar={() => <input aria-label="Custom control" defaultValue="Draft" />} /></ThemeProvider>);
+    const input = screen.getByRole('textbox', { name: 'Custom control' });
+    fireEvent.change(input, { target: { value: 'Unsaved draft' } });
+    for (const name of ['Grey', 'Dark', 'Default']) {
+      fireEvent.click(screen.getByLabelText('theme selector'));
+      fireEvent.click(screen.getByRole('menuitem', { name, exact: true }));
+      expect(screen.getByRole('textbox', { name: 'Custom control' })).toBe(input);
+      expect(input).toHaveValue('Unsaved draft');
+      expect(getComputedStyle(screen.getByRole('columnheader', { name: 'Name' })).backgroundColor).toBe('rgb(12, 34, 56)');
+      expect(getComputedStyle(screen.getByRole('columnheader', { name: 'Name' })).fontFamily).toBe('monospace');
+    }
+  });
   it.each([false, true])('inherits application theme and cell overrides with selector=%s', enableThemes => {
     const theme = createTheme({ palette: { mode: 'dark', primary: { main: '#7b1fa2' } },
       components: { MuiTableCell: { styleOverrides: { head: { backgroundColor: 'rgb(12, 34, 56)' } } } } });

@@ -64,3 +64,19 @@ test('generic bulk actions use first-column selection and split toolbar placemen
   const exportBox = await exported.boundingBox();
   expect(exportBox.x).toBeGreaterThan(searchBox.x + searchBox.width);
 });
+
+
+test('theme presets visibly change table surfaces without resetting search', async ({ page }) => {
+  await page.goto('/examples/themes');
+  await page.getByRole('button', { name: 'Open search', exact: true }).click();
+  const search = page.getByRole('textbox', { name: 'Search', exact: true });
+  await search.fill('Ada');
+  const surface = page.locator('.MuiPaper-root').filter({ has: page.getByRole('table') });
+  for (const [name, color] of [['Grey', 'rgb(245, 245, 245)'], ['Blue', 'rgb(240, 247, 255)'], ['Dark', 'rgb(18, 18, 18)'], ['Default', 'rgb(255, 255, 255)']]) {
+    await page.getByRole('button', { name: 'theme selector', exact: true }).click();
+    await page.getByRole('menuitem', { name, exact: true }).click();
+    await expect(surface).toHaveCSS('background-color', color);
+    await expect(search).toHaveValue('Ada');
+    await expect(page.getByRole('table').getByText('Grace', { exact: true })).toHaveCount(0);
+  }
+});

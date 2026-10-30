@@ -56,7 +56,7 @@ import {
   Tooltip as Tooltip6,
   Typography as Typography2
 } from "@mui/material";
-import { ThemeProvider } from "@mui/material/styles";
+import { createTheme as createTheme2, ThemeProvider, useTheme } from "@mui/material/styles";
 import DensityMediumIcon from "@mui/icons-material/DensityMedium";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
@@ -324,42 +324,25 @@ var themes = {
   default: createTheme(),
   grey: createTheme({
     palette: {
-      primary: {
-        main: "#9e9e9e"
-        // grey 500
-      },
-      secondary: {
-        main: "#bdbdbd"
-        // grey 400
-      }
+      primary: { main: "#616161" },
+      secondary: { main: "#757575" },
+      background: { default: "#eeeeee", paper: "#f5f5f5" }
     }
   }),
   blue: createTheme({
     palette: {
-      primary: {
-        main: "#1976d2"
-      },
-      secondary: {
-        main: "#ff4081"
-      }
+      primary: { main: "#1565c0" },
+      secondary: { main: "#7b1fa2" },
+      background: { default: "#e3f2fd", paper: "#f0f7ff" }
     }
   }),
-  light: createTheme({
-    palette: {
-      mode: "light",
-      primary: {
-        main: "#90caf9"
-      },
-      secondary: {
-        main: "#f48fb1"
-      }
-    }
-  })
+  light: createTheme({ palette: { mode: "light" } }),
+  dark: createTheme({ palette: { mode: "dark" } })
 };
 
 // src/ThemeSelector.jsx
 import Tooltip4 from "@mui/material/Tooltip";
-var ThemeSelector = ({ handleThemeChange, labels }) => {
+var ThemeSelector = ({ handleThemeChange, labels, currentTheme }) => {
   const [anchorEl, setAnchorEl] = React4.useState(null);
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -370,18 +353,20 @@ var ThemeSelector = ({ handleThemeChange, labels }) => {
       handleThemeChange(theme);
     }
   };
-  return /* @__PURE__ */ React4.createElement("div", null, /* @__PURE__ */ React4.createElement(IconButton4, { "aria-label": labels.themeSelector, onClick: handleClick }, /* @__PURE__ */ React4.createElement(Tooltip4, { describeChild: true, title: labels.themeSelector }, /* @__PURE__ */ React4.createElement(PaletteIcon, null))), /* @__PURE__ */ React4.createElement(
+  return /* @__PURE__ */ React4.createElement("div", null, /* @__PURE__ */ React4.createElement(IconButton4, { "aria-label": labels.themeSelector, "aria-haspopup": "menu", "aria-expanded": Boolean(anchorEl), onClick: handleClick }, /* @__PURE__ */ React4.createElement(Tooltip4, { describeChild: true, title: labels.themeSelector }, /* @__PURE__ */ React4.createElement(PaletteIcon, null))), /* @__PURE__ */ React4.createElement(
     Menu3,
     {
       anchorEl,
       open: Boolean(anchorEl),
       onClose: () => handleClose(null)
     },
-    Object.keys(themes).map((theme) => /* @__PURE__ */ React4.createElement(MenuItem3, { key: theme, onClick: () => handleClose(theme) }, theme.charAt(0).toUpperCase() + theme.slice(1)))
+    Object.keys(themes).map((theme) => /* @__PURE__ */ React4.createElement(MenuItem3, { key: theme, selected: currentTheme === theme, "aria-current": currentTheme === theme ? "true" : void 0, onClick: () => handleClose(theme) }, theme.charAt(0).toUpperCase() + theme.slice(1)))
   ));
 };
 ThemeSelector.propTypes = {
-  handleThemeChange: PropTypes3.func.isRequired
+  handleThemeChange: PropTypes3.func.isRequired,
+  currentTheme: PropTypes3.oneOf(Object.keys(themes)).isRequired,
+  labels: PropTypes3.object.isRequired
 };
 var ThemeSelector_default = ThemeSelector;
 
@@ -601,6 +586,8 @@ function DynamicTable(props) {
   const headers = useMemo2(() => normalizeColumns(props.headers), [props.headers]);
   const model = useTableModel({ ...props, headers });
   const [theme, setTheme] = useState5("default");
+  const applicationTheme = useTheme();
+  const activeTheme = useMemo2(() => props.enableThemes && theme !== "default" ? createTheme2(applicationTheme, { palette: themes[theme].palette }) : applicationTheme, [applicationTheme, props.enableThemes, theme]);
   const [dense, setDense] = useState5(false);
   const [fullscreen, setFullscreen] = useState5(false);
   const [fullscreenError, setFullscreenError] = useState5("");
@@ -834,7 +821,7 @@ function DynamicTable(props) {
       onRowsPerPageChange: (event) => model.update({ rowsPerPage: Number(event.target.value), page: 0 })
     }
   ));
-  return props.enableThemes && theme !== "default" ? /* @__PURE__ */ React7.createElement(ThemeProvider, { theme: themes[theme] }, content) : /* @__PURE__ */ React7.createElement(Box2, null, content);
+  return /* @__PURE__ */ React7.createElement(ThemeProvider, { theme: activeTheme }, /* @__PURE__ */ React7.createElement(Box2, null, content));
 }
 export {
   DynamicTable,
