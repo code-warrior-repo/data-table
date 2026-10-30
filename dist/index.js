@@ -56,7 +56,7 @@ import {
   Tooltip as Tooltip6,
   Typography as Typography2
 } from "@mui/material";
-import { createTheme as createTheme2, ThemeProvider, useTheme } from "@mui/material/styles";
+import { ThemeProvider, useTheme } from "@mui/material/styles";
 import DensityMediumIcon from "@mui/icons-material/DensityMedium";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
@@ -321,24 +321,42 @@ import PropTypes3 from "prop-types";
 // src/themes.js
 import { createTheme } from "@mui/material/styles";
 var themes = {
-  default: createTheme(),
+  default: createTheme({ palette: { primary: { main: "#008000" }, secondary: { main: "#ff4081" } } }),
   grey: createTheme({
     palette: {
-      primary: { main: "#616161" },
-      secondary: { main: "#757575" },
+      primary: { main: "#9e9e9e" },
+      secondary: { main: "#bdbdbd" },
       background: { default: "#eeeeee", paper: "#f5f5f5" }
     }
   }),
   blue: createTheme({
     palette: {
-      primary: { main: "#1565c0" },
-      secondary: { main: "#7b1fa2" },
+      primary: { main: "#1976d2" },
+      secondary: { main: "#ff4081" },
       background: { default: "#e3f2fd", paper: "#f0f7ff" }
     }
   }),
-  light: createTheme({ palette: { mode: "light" } }),
+  light: createTheme({ palette: { mode: "light", primary: { main: "#90caf9" }, secondary: { main: "#f48fb1" } } }),
   dark: createTheme({ palette: { mode: "dark" } })
 };
+function createTableTheme(applicationTheme, preset = "default") {
+  return createTheme(applicationTheme, {
+    palette: themes[preset].palette,
+    components: {
+      MuiTableCell: {
+        styleOverrides: {
+          head: ({ theme }) => ({
+            backgroundColor: theme.palette.primary.main,
+            color: theme.palette.primary.contrastText,
+            fontSize: "inherit",
+            "& .MuiTableSortLabel-root, & .MuiTableSortLabel-root:hover, & .MuiTableSortLabel-root.Mui-active": { color: "inherit" },
+            "& .MuiTableSortLabel-icon, & .MuiCheckbox-root, & .MuiCheckbox-root.Mui-checked": { color: "inherit" }
+          })
+        }
+      }
+    }
+  }, { components: applicationTheme.components });
+}
 
 // src/ThemeSelector.jsx
 import Tooltip4 from "@mui/material/Tooltip";
@@ -372,13 +390,28 @@ var ThemeSelector_default = ThemeSelector;
 
 // src/StyledComponents.js
 import { styled } from "@mui/material/styles";
-import TableCell from "@mui/material/TableCell";
-import { default as default2 } from "@mui/material/TableCell";
-import { default as default3 } from "@mui/material/TableRow";
-var StyledActionTableCell = styled(TableCell)({
-  whiteSpace: "nowrap",
-  width: "1%"
+import TableCell, { tableCellClasses } from "@mui/material/TableCell";
+import TableRow from "@mui/material/TableRow";
+var StyledTableCell = styled(TableCell)({
+  [`&.${tableCellClasses.body}`]: { fontSize: 14 }
 });
+var StyledTableRow = styled(TableRow)(({ theme }) => ({
+  "&:nth-of-type(odd)": { backgroundColor: theme.palette.action.hover },
+  "&:last-child td, &:last-child th": { border: 0 }
+}));
+var StyledActionTableCell = styled(StyledTableCell)(({ theme }) => ({
+  whiteSpace: "nowrap",
+  textAlign: "right",
+  width: "1%",
+  paddingRight: theme.spacing(2),
+  "& .MuiButtonBase-root": {
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: theme.spacing(0.5)
+  },
+  "& .MuiButton-root:hover": { textDecoration: "underline" }
+}));
 
 // src/CustomTablePagination.jsx
 import React5 from "react";
@@ -392,6 +425,7 @@ function CustomTablePagination({
   rowsPerPageOptions = [5, 10, 20, 30, { value: -1, label: "All" }],
   labels
 }) {
+  const labelId = React5.useId();
   const options = rowsPerPageOptions.some((option) => (option.value ?? option) === rowsPerPage) ? rowsPerPageOptions : [rowsPerPage, ...rowsPerPageOptions];
   return /* @__PURE__ */ React5.createElement(
     TablePagination,
@@ -400,6 +434,17 @@ function CustomTablePagination({
       count,
       page,
       rowsPerPage,
+      sx: { color: "text.primary", bgcolor: "background.paper" },
+      slotProps: {
+        select: {
+          labelId,
+          inputProps: { "aria-labelledby": labelId },
+          SelectDisplayProps: { "aria-label": labels.rowsPerPage },
+          sx: { color: "text.primary", "& .MuiSelect-icon": { color: "text.primary" } },
+          MenuProps: { slotProps: { paper: { sx: { color: "text.primary", bgcolor: "background.paper" } } } }
+        },
+        menuItem: { sx: { color: "text.primary" } }
+      },
       rowsPerPageOptions: options,
       onPageChange: (_, next) => onPageChange(next),
       onRowsPerPageChange,
@@ -564,7 +609,7 @@ function DynamicTable(props) {
   const slots = props.slots ?? {};
   const slotProps = props.slotProps ?? {};
   const Root = slots.root ?? Paper, Toolbar = slots.toolbar ?? Stack2, Head = slots.header ?? TableHead;
-  const Body = slots.body ?? TableBody, Row = slots.row ?? default3, Cell = slots.cell ?? default2;
+  const Body = slots.body ?? TableBody, Row = slots.row ?? StyledTableRow, Cell = slots.cell ?? StyledTableCell;
   const ActionCell = slots.actionCell ?? StyledActionTableCell, TableComponent = slots.table ?? Table;
   const Footer = slots.footer ?? CustomTablePagination;
   const {
@@ -587,7 +632,10 @@ function DynamicTable(props) {
   const model = useTableModel({ ...props, headers });
   const [theme, setTheme] = useState5("default");
   const applicationTheme = useTheme();
-  const activeTheme = useMemo2(() => props.enableThemes && theme !== "default" ? createTheme2(applicationTheme, { palette: themes[theme].palette }) : applicationTheme, [applicationTheme, props.enableThemes, theme]);
+  const activeTheme = useMemo2(
+    () => createTableTheme(applicationTheme, props.enableThemes ? theme : "default"),
+    [applicationTheme, props.enableThemes, theme]
+  );
   const [dense, setDense] = useState5(false);
   const [fullscreen, setFullscreen] = useState5(false);
   const [fullscreenError, setFullscreenError] = useState5("");

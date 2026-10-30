@@ -113,7 +113,7 @@ The controlled-page example demonstrates native partial controlled state in clie
 
 | Example | Source | Purpose |
 |---|---|---|
-| [Application theme](http://localhost:3000/examples/parent-theme) | [parent-theme.jsx](examples/parent-theme.jsx) | The table inherits a parent MUI ThemeProvider when the library selector is disabled. |
+| [Application theme](http://localhost:3000/examples/parent-theme) | [parent-theme.jsx](examples/parent-theme.jsx) | Application typography and explicit component overrides are retained alongside the table palette. |
 | [Built-in theme selector](http://localhost:3000/examples/themes) | [themes.jsx](examples/themes.jsx) | Choose one of the library themes. |
 | [Density toggle](http://localhost:3000/examples/density) | [density.jsx](examples/density.jsx) | Use the density icon to switch row padding. |
 | [Fullscreen toggle](http://localhost:3000/examples/fullscreen) | [fullscreen.jsx](examples/fullscreen.jsx) | Enter and exit browser fullscreen. Unsupported browsers show feedback. |

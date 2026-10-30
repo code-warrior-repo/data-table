@@ -17,8 +17,8 @@ A production decision should target specific supported use cases, dataset sizes,
 - `src/spring.js` now provides `toSpringRequest` so paging and export criteria share one mapping.
 - `fetchAllSpringRows` retrieves bounded pages sequentially and returns a complete row array, with cancellation, progress, row/page limits and optional duplicate-ID checking. It rejects changed totals, malformed/incomplete results and exceeded bounds rather than silently truncating.
 - The Spring source validates pagination and transport response shape and checks cancellation around fetch/JSON processing.
-- Default cells/rows use native MUI styling; colored headers, forced white text, font overrides and zebra striping were removed. Application theme overrides remain effective.
-- The theme selector's default now inherits the app theme; with no provider this is MUI's standard theme. Nondefault presets remain opt-in.
+- The default palette is the original green (`#008000`), with themed headers, contrasting text and alternating row shading. Application typography and component overrides remain effective.
+- The theme selector starts at green Default; selecting a preset changes headers, accents, surfaces and pagination together. Returning to Default restores green without remounting controls. Pagination retains explicit accessible label associations and paired theme colors.
 - The Spring example reuses one source for normal page requests and full-result exports. The README covers the new helpers and behavioral changes.
 
 MUI's [default theme documentation](https://mui.com/material-ui/customization/default-theme/) explains the baseline `createTheme()` behavior. Standard styling is a maintainability and integration improvement, not evidence that the whole component meets a production bar.
@@ -73,7 +73,7 @@ Impact: successful DOM tests do not prove keyboard focus, screen-reader announce
 
 Recommendation: add a Playwright browser suite and automated accessibility checks. Verify names, focus return after popovers, search autofocus, multi-sort priority announcements, error/live regions and zoom/RTL/mobile behavior. Expose a localization dictionary instead of scattering hardcoded English strings. Use [MUI's table accessibility guidance](https://mui.com/material-ui/react-table/#accessibility) as a starting point, followed by manual screen-reader checks.
 
-Acceptance: keyboard-only completion of the supported table tasks; no serious/critical automated accessibility findings in the agreed matrix; recorded manual screen-reader, zoom and responsive verification. Native MUI styling now supplies the baseline rather than a forced header palette.
+Acceptance: keyboard-only completion of the supported table tasks; no serious/critical automated accessibility findings in the agreed matrix; recorded manual screen-reader, zoom and responsive verification. Header and pagination contrast checks cover each built-in preset under light/dark application themes; custom application overrides still require validation.
 
 ### P1 — Make identity and selection an explicit contract
 

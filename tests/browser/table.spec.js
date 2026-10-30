@@ -71,12 +71,37 @@ test('theme presets visibly change table surfaces without resetting search', asy
   await page.getByRole('button', { name: 'Open search', exact: true }).click();
   const search = page.getByRole('textbox', { name: 'Search', exact: true });
   await search.fill('Ada');
+  await expect(page.getByRole('columnheader').first()).toHaveCSS('background-color', 'rgb(0, 128, 0)');
   const surface = page.locator('.MuiPaper-root').filter({ has: page.getByRole('table') });
   for (const [name, color] of [['Grey', 'rgb(245, 245, 245)'], ['Blue', 'rgb(240, 247, 255)'], ['Dark', 'rgb(18, 18, 18)'], ['Default', 'rgb(255, 255, 255)']]) {
     await page.getByRole('button', { name: 'theme selector', exact: true }).click();
     await page.getByRole('menuitem', { name, exact: true }).click();
     await expect(surface).toHaveCSS('background-color', color);
+    if (name === 'Default') await expect(page.getByRole('columnheader').first()).toHaveCSS('background-color', 'rgb(0, 128, 0)');
     await expect(search).toHaveValue('Ada');
     await expect(page.getByRole('table').getByText('Grace', { exact: true })).toHaveCount(0);
   }
 });
+
+
+for (const applicationMode of ['light', 'dark']) {
+test(`rows-per-page dropdown meets text contrast in every preset with ${applicationMode} application`, async ({ page }) => {
+  await page.goto('/examples/themes');
+  if (applicationMode === 'dark') await page.getByRole('button', { name: 'Use dark theme', exact: true }).click();
+  for (const name of ['Default', 'Grey', 'Blue', 'Light', 'Dark']) {
+    await page.getByRole('button', { name: 'theme selector', exact: true }).click();
+    await page.getByRole('menuitem', { name, exact: true }).click();
+    const dropdown = page.getByRole('combobox', { name: 'Rows per page:' });
+    await expect(page.locator('.MuiTablePagination-root input')).toHaveAttribute('aria-labelledby', await dropdown.getAttribute('aria-labelledby'));
+    const closed = await new AxeBuilder({ page }).include('.MuiTablePagination-root').include('.MuiTableHead-root').withRules(['color-contrast', 'label', 'select-name', 'aria-input-field-name']).analyze();
+    expect(closed.violations, `${name}: closed dropdown`).toEqual([]);
+    await dropdown.click();
+    const list = page.getByRole('listbox');
+    await expect(list).toBeVisible();
+    await page.getByRole('option', { name: '10', exact: true }).hover();
+    const open = await new AxeBuilder({ page }).include('.MuiTablePagination-menuItem').withRules(['color-contrast', 'label', 'select-name', 'aria-input-field-name']).analyze();
+    expect(open.violations, `${name}: selected and hovered options`).toEqual([]);
+    await page.keyboard.press('Escape');
+  }
+});
+}

@@ -2,9 +2,14 @@
 
 ## Unreleased — production hardening
 
+### Pagination accessibility
+
+- Added explicit localized accessible names to the rows-per-page selector and its underlying input, retaining MUI’s visible label association.
+- Explicitly paired rows-per-page foreground and popup surface colors with theme tokens to protect against application input/menu color overrides. Added contrast checks for closed, selected and hovered options in every preset under light/dark application themes.
+
 ### Theme selection
 
-- Made Grey/Blue presets visibly tint the table surface and added a standard MUI Dark preset. Default still follows the application theme.
+- Made Grey/Blue presets visibly tint the table surface and added a standard MUI Dark preset. Default is the original green theme (`#008000`), including when the selector is hidden. Restored themed headers and striped rows; header text, sort labels and checkboxes use contrasting colors.
 - Theme changes preserve mounted controls and application typography/component overrides; the menu now marks the active choice.
 
 ### Generic selection and toolbar placement

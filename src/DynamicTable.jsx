@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Box, Checkbox, IconButton, LinearProgress, Paper, Stack, Table, TableBody,
   TableContainer, TableHead, TableSortLabel, TextField, Tooltip, Typography } from '@mui/material';
-import { createTheme, ThemeProvider, useTheme } from '@mui/material/styles';
+import { ThemeProvider, useTheme } from '@mui/material/styles';
 import DensityMediumIcon from '@mui/icons-material/DensityMedium';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
@@ -12,7 +12,7 @@ import ExportOptions from './ExportOptions';
 import MultiColumnSort from './MultiColumnSort';
 import ThemeSelector from './ThemeSelector';
 import { defaultTableLabels } from './labels.js';
-import { themes } from './themes';
+import { createTableTheme } from './themes';
 import { StyledActionTableCell, StyledTableCell, StyledTableRow } from './StyledComponents';
 import CustomTablePagination from './CustomTablePagination';
 import { insertSelectionCell, arrangeToolbarControls } from './core/layout.js';
@@ -40,9 +40,8 @@ export default function DynamicTable(props) {
   const model = useTableModel({ ...props, headers });
   const [theme, setTheme] = useState('default');
   const applicationTheme = useTheme();
-  const activeTheme = useMemo(() => props.enableThemes && theme !== 'default'
-    ? createTheme(applicationTheme, { palette: themes[theme].palette })
-    : applicationTheme, [applicationTheme, props.enableThemes, theme]);
+  const activeTheme = useMemo(() => createTableTheme(applicationTheme, props.enableThemes ? theme : 'default'),
+    [applicationTheme, props.enableThemes, theme]);
   const [dense, setDense] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState('');

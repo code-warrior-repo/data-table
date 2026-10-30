@@ -294,7 +294,7 @@ The menu exports matching, sorted rows across all client pages. It ignores email
 | `maxHeight` | `number or CSS string` | unset | Maximum scrolling body-container height. |
 | `enableDensePadding` | `boolean` | `false` | Show a density toggle; initial row size is medium. |
 | `enableFullScreenOption` | `boolean` | `false` | Show browser fullscreen controls. Unsupported/rejected fullscreen shows feedback. |
-| `enableThemes` | `boolean` | `false` | Show the library theme selector: `default`, `grey`, `blue`, `light`, `dark`; initial selection is `default`, which inherits the parent theme (standard MUI when none is supplied). Grey/Blue tint the table surface; Light/Dark use standard MUI palettes. Presets apply to this table and retain application typography and component overrides. Explicit overrides may take precedence over preset colors. |
+| `enableThemes` | `boolean` | `false` | Show the library theme selector: `default`, `grey`, `blue`, `light`, `dark`; initial selection is `default`, the original green palette (`#008000`). The table uses green even when the selector is hidden. Headers follow each selected palette and use its contrasting text color. Grey/Blue also tint the table surface; Light uses light blue accents and Dark uses the MUI dark palette. Presets apply to this table and retain application typography and component overrides. Explicit overrides may take precedence over preset colors. |
 | `tooltipFields` | `Record<field, string[]>` | no tooltips | Header information buttons; array items are joined with commas. |
 | `renderToolbar` | `(context) => ReactNode` | unset | Append controls/content to the existing toolbar. Does not replace the default toolbar. |
 
@@ -807,7 +807,7 @@ The helper's `signal` and `onProgress` can be forwarded directly from the built-
 - Internal `RowActions`, export menus, styled components, themes, date/path utilities and pagination controls are not public package exports. Import only the names listed in [public exports](#public-exports).
 - The package now exposes controlled query state, declaration files, helper subpaths, selection ownership, export jobs, slots and localization. Column visibility/reordering/resizing, grouped headers, trees, persistence, print controls and virtualization remain future scope. See the [parity plan](docs/mui-datatables-parity-plan.md) and [tablekit review](docs/mui-tablekit-review.md) for proposed work; those are not implemented API parameters.
 
-Default table cells and rows now use standard MUI styling; no green header, forced white header text or zebra striping is applied. Parent theme component overrides remain effective, including when the selector is at `default`.
+The default table theme is green (`#008000`), with contrasting header text and alternating row shading. Selecting another theme updates the header, accents, table surface and pagination together. Application typography and component overrides remain effective; explicit header overrides can take precedence over preset colors. Pagination keeps accessible labels and theme-based foreground/background colors.
 
 See the [hardening implementation status](docs/hardening-status.md), [migration notes](CHANGELOG.md) and [production-readiness review](docs/production-readiness-review.md) for current blockers, evidence and release criteria. Passing the existing tests/build is not a production certification.
 

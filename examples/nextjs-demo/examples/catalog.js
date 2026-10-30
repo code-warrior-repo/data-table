@@ -231,7 +231,7 @@ export const examples = [
     "slug": "parent-theme",
     "title": "Application theme",
     "group": "Presentation",
-    "description": "The table inherits a parent MUI ThemeProvider when the library selector is disabled."
+    "description": "Application typography and explicit component overrides are retained alongside the table palette."
   },
   {
     "slug": "themes",
