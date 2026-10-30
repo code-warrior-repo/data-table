@@ -1,4 +1,17 @@
 'use client';
+import LayoutExample0 from './bulk-actions';
+import LayoutExample1 from './selection-first';
+import LayoutExample2 from './selection-last';
+import LayoutExample3 from './selection-position';
+import LayoutExample4 from './toolbar-left';
+import LayoutExample5 from './toolbar-right';
+import LayoutExample6 from './toolbar-split';
+import NewExample0 from './controlled-query';
+import NewExample1 from './component-slots';
+import NewExample2 from './localization';
+import NewExample3 from './controlled-selection';
+import NewExample4 from './endpoint-handler';
+import SpringFullExport from './spring-export';
 import Example0 from './basic';
 import Example1 from './column-options';
 import Example2 from './composite-columns';
@@ -54,6 +67,21 @@ import Example51 from './blob-builders';
 import Example52 from './serialization';
 
 export const exampleComponents = {
+  'bulk-actions': LayoutExample0,
+  'selection-first': LayoutExample1,
+  'selection-last': LayoutExample2,
+  'selection-position': LayoutExample3,
+  'toolbar-left': LayoutExample4,
+  'toolbar-right': LayoutExample5,
+  'toolbar-split': LayoutExample6,
+
+  'controlled-query': NewExample0,
+  'component-slots': NewExample1,
+  'localization': NewExample2,
+  'controlled-selection': NewExample3,
+  'endpoint-handler': NewExample4,
+
+  'spring-export': SpringFullExport,
   'basic': Example0,
   'column-options': Example1,
   'composite-columns': Example2,

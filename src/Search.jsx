@@ -5,7 +5,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import PropTypes from 'prop-types';
 import Tooltip from '@mui/material/Tooltip';
 
-const Search = ({ searchText, handleSearchTextChange }) => {
+const Search = ({ searchText, handleSearchTextChange, labels }) => {
   const [showSearch, setShowSearch] = useState(false);
 
   const toggleSearch = () => {
@@ -19,7 +19,8 @@ const Search = ({ searchText, handleSearchTextChange }) => {
     <Box display="flex" alignItems="center">
       {showSearch && (
         <TextField
-          label="Search"
+          label={labels.search}
+          autoFocus
           variant="outlined"
           value={searchText}
           onChange={handleSearchTextChange}
@@ -28,10 +29,10 @@ const Search = ({ searchText, handleSearchTextChange }) => {
           size='small'
         />
       )}
-      <Tooltip title={showSearch ? 'Close' : 'Search'}>
+      <Tooltip describeChild title={showSearch ? labels.closeSearch : labels.openSearch}>
         <IconButton
             onClick={toggleSearch}
-            aria-label={showSearch ? 'Close search' : 'Open search'}
+            aria-label={showSearch ? labels.closeSearch : labels.openSearch}
         >
           {showSearch ? (
               <CloseIcon aria-hidden="true" />

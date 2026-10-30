@@ -1,16 +1,17 @@
+function checkAbort(signal) { if (signal?.aborted) throw signal.reason ?? new DOMException('Export aborted', 'AbortError'); }
+
 export function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  try { document.body.appendChild(link); link.click(); }
+  finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 }
 function csvCell(value) {
-  const text = value == null ? '' : String(value);
-  const safe = /^[\s]*[=+@\-]|^[\t\r\n]/.test(text) ? "'" + text : text;
+  const text = textValue(value);
+  const formula = /^[\s\u0000-\u001f]*[=+@\-＝＋＠－]|^[\t\r\n]/u.test(text);
+  const safe = typeof value !== 'number' && formula ? "'" + text : text;
   return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
@@ -43,7 +44,7 @@ function textValue(value) {
 
 export function rowsToCsv(context) {
   const { headers, values } = getExportData(context);
-  return [headers, ...values].map(row => row.map(value => csvCell(textValue(value))).join(',')).join('\r\n');
+  return [headers, ...values].map(row => row.map(value => csvCell(value)).join(',')).join('\r\n');
 }
 
 /** Tab-separated plain text; embedded tabs/newlines are displayed as escapes. */
@@ -70,19 +71,29 @@ export function rowsToJson(context) {
 }
 
 export function exportRowsAsCsv({ filename = 'table.csv', ...context }) {
-  downloadBlob(new Blob(['\uFEFF', rowsToCsv(context)], { type: 'text/csv;charset=utf-8' }), filename);
+  checkAbort(context.signal);
+  const text = rowsToCsv(context);
+  checkAbort(context.signal);
+  downloadBlob(new Blob(['\uFEFF', text], { type: 'text/csv;charset=utf-8' }), filename);
 }
 
 export function exportRowsAsTxt({ filename = 'table.txt', ...context }) {
-  downloadBlob(new Blob([rowsToTxt(context)], { type: 'text/plain;charset=utf-8' }), filename);
+  checkAbort(context.signal);
+  const text = rowsToTxt(context);
+  checkAbort(context.signal);
+  downloadBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), filename);
 }
 
 export function exportRowsAsJson({ filename = 'table.json', ...context }) {
-  downloadBlob(new Blob([rowsToJson(context)], { type: 'application/json;charset=utf-8' }), filename);
+  checkAbort(context.signal);
+  const text = rowsToJson(context);
+  checkAbort(context.signal);
+  downloadBlob(new Blob([text], { type: 'application/json;charset=utf-8' }), filename);
 }
 
 /** Load the spreadsheet engine only when XLSX is requested. */
 export async function createXlsxBlob(context) {
+  checkAbort(context.signal);
   const module = await import('exceljs');
   const ExcelJS = module.default ?? module;
   const { headers, values } = getExportData(context);
@@ -95,17 +106,22 @@ export async function createXlsxBlob(context) {
   sheet.getRow(1).font = { bold: true };
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
   sheet.columns.forEach(column => { column.width = 24; });
-  return new Blob([await workbook.xlsx.writeBuffer()], {
+  const buffer = await workbook.xlsx.writeBuffer();
+  checkAbort(context.signal);
+  return new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   });
 }
 
 export async function exportRowsAsXlsx({ filename = 'table.xlsx', ...context }) {
-  downloadBlob(await createXlsxBlob(context), filename);
+  const blob = await createXlsxBlob(context);
+  checkAbort(context.signal);
+  downloadBlob(blob, filename);
 }
 
 /** Load the PDF engine only when PDF is requested. */
 export async function createPdfBlob(context) {
+  checkAbort(context.signal);
   const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const { headers, values } = getExportData(context);
   const doc = new jsPDF({ orientation: 'landscape' });
@@ -117,11 +133,15 @@ export async function createPdfBlob(context) {
     horizontalPageBreak: true,
     showHead: 'everyPage'
   });
-  return doc.output('blob');
+  const blob = doc.output('blob');
+  checkAbort(context.signal);
+  return blob;
 }
 
 export async function exportRowsAsPdf({ filename = 'table.pdf', ...context }) {
-  downloadBlob(await createPdfBlob(context), filename);
+  const blob = await createPdfBlob(context);
+  checkAbort(context.signal);
+  downloadBlob(blob, filename);
 }
 
 export const defaultExportHandlers = {
@@ -131,7 +151,10 @@ export const defaultExportHandlers = {
 
 /** Server export is recommended for full datasets and Excel/PDF. */
 export async function exportWithEndpoint({ url, filename, fetcher = fetch, signal, method = 'GET', body }) {
+  checkAbort(signal);
   const response = await fetcher(url, { method, signal, credentials: 'same-origin', ...(body == null ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) });
   if (!response.ok) throw new Error(`Export failed (${response.status})`);
-  downloadBlob(await response.blob(), filename);
+  const blob = await response.blob();
+  checkAbort(signal);
+  downloadBlob(blob, filename);
 }

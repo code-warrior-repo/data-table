@@ -8,35 +8,63 @@
   "module": "./dist/index.js",
   "exports": {
     ".": {
+      "types": "./types/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./types/core.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./spring": {
+      "types": "./types/spring.d.ts",
+      "import": "./dist/spring.js"
+    },
+    "./exports": {
+      "types": "./types/exports.d.ts",
+      "import": "./dist/exports.js"
     }
   },
   "files": [
     "dist",
+    "types",
+    "src",
     "README.md",
-    "LICENSE"
+    "docs",
+    "examples/nextjs-demo/README.md",
+    "examples/nextjs-demo/examples",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
     "lint": "eslint .",
-    "check": "npm run lint && npm test && npm run build",
-    "prepack": "npm run build"
+    "check": "npm run lint && npm run typecheck && npm test && npm run build",
+    "prepack": "npm run build",
+    "typecheck": "tsc -p tests/types/tsconfig.json",
+    "test:browser": "playwright test",
+    "test:package": "node scripts/check-package.mjs",
+    "benchmark": "node scripts/benchmark.mjs"
   },
   "peerDependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@mui/material": "^9.5.0",
     "@mui/icons-material": "^9.5.0",
+    "@mui/material": "^9.5.0",
     "react": "^18.2.0 || ^19.0.0",
     "react-dom": "^18.2.0 || ^19.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/material": "^9.5.0",
+    "@playwright/test": "^1.64.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "eslint": "^10.13.0",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -53,10 +81,11 @@
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
   "dependencies": {
+    "date-fns": "^4.4.0",
     "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.9",
-    "date-fns": "^4.4.0",
     "prop-types": "^15.8.1"
-  }
+  },
+  "types": "./types/index.d.ts"
 }

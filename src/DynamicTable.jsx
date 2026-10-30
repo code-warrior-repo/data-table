@@ -11,36 +11,74 @@ import Search from './Search';
 import ExportOptions from './ExportOptions';
 import MultiColumnSort from './MultiColumnSort';
 import ThemeSelector from './ThemeSelector';
+import { defaultTableLabels } from './labels.js';
 import { themes } from './themes';
 import { StyledActionTableCell, StyledTableCell, StyledTableRow } from './StyledComponents';
 import CustomTablePagination from './CustomTablePagination';
-import { getByPath } from './util';
+import { insertSelectionCell, arrangeToolbarControls } from './core/layout.js';
+import { rowIdentities } from './core/identity.js';
 import { getColumnText, getColumnValue, normalizeColumns } from './core/columns.js';
 import { useTableModel } from './hooks/useTableModel.js';
 import { buildActions, renderLegacyRowActions } from './compat/legacyActions.jsx';
 
 /** MUI presentation over an independent row model; server requests belong to the caller. */
 export default function DynamicTable(props) {
+  const labels = { ...defaultTableLabels, ...props.labels };
+  const slots = props.slots ?? {};
+  const slotProps = props.slotProps ?? {};
+  const Root = slots.root ?? Paper, Toolbar = slots.toolbar ?? Stack, Head = slots.header ?? TableHead;
+  const Body = slots.body ?? TableBody, Row = slots.row ?? StyledTableRow, Cell = slots.cell ?? StyledTableCell;
+  const ActionCell = slots.actionCell ?? StyledActionTableCell, TableComponent = slots.table ?? Table;
+  const Footer = slots.footer ?? CustomTablePagination;
   const { enableColumnFilters = false, loading = false, error,
-    emptyDataMessage = 'No matching records.', pageTitle = '', enableEmail = false,
+    emptyDataMessage = labels.empty, pageTitle = '', enableEmail = false,
     uniqueField = '', getRowId, onEmail, serverSidePagination = false, fetchAllForExport } = props;
+  const selectionEnabled = Boolean(props.enableRowSelection || enableEmail);
+  const selectionLabel = props.selectionColumnLabel ?? (props.enableRowSelection ? labels.selection : labels.email);
+  const selectAllLabel = props.enableRowSelection ? labels.selectAllRows : labels.selectAllEmails;
   const headers = useMemo(() => normalizeColumns(props.headers), [props.headers]);
   const model = useTableModel({ ...props, headers });
   const [theme, setTheme] = useState('default');
   const [dense, setDense] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState('');
-  // Selection is scoped to the current data array to avoid emailing stale server pages.
-  const [selection, setSelection] = useState({ data: props.data, ids: new Set() });
-  const selected = selection.data === props.data ? selection.ids : new Set();
+  // Explicit selection ownership/reset policy; email is a compatibility action over matching rows.
+  const [selection, setSelection] = useState({ data: props.data, datasetKey: props.datasetKey, ids: new Set(props.initialSelectedRowIds ?? []) });
+  const selectionValid = Object.is(selection.datasetKey, props.datasetKey) &&
+    (props.selectionReset === 'dataset' || selection.data === props.data);
+  const selected = props.selectedRowIds !== undefined ? new Set(props.selectedRowIds) : selectionValid ? selection.ids : new Set();
+  useEffect(() => {
+    setSelection(previous => {
+      const valid = Object.is(previous.datasetKey, props.datasetKey) &&
+        (props.selectionReset === 'dataset' || previous.data === props.data);
+      return valid ? previous : { data: props.data, datasetKey: props.datasetKey, ids: new Set() };
+    });
+  }, [props.data, props.datasetKey, props.selectionReset]);
   const ref = useRef(null);
   const actions = buildActions(props);
   const hasActions = props.enableRowActions !== false &&
     (typeof props.renderRowActions === 'function' || actions.length > 0);
-  const identify = row => getRowId ? getRowId(row) : getByPath(row, uniqueField || 'id') ?? row;
+  const requireIds = Boolean(selectionEnabled || props.renderBulkActions || hasActions || headers.some(header => header.renderCell));
+  const identities = useMemo(() => rowIdentities(props.data ?? [], { getRowId, uniqueField, requireIds }),
+    [props.data, getRowId, uniqueField, requireIds]);
+  const identify = row => identities.get(row);
+  function updateSelection(ids) {
+    if (props.selectedRowIds === undefined) setSelection({ data: props.data, datasetKey: props.datasetKey, ids });
+    props.onSelectionChange?.([...ids]);
+  }
   const selectedRows = model.filteredRows.filter(row => selected.has(identify(row)));
-  const allSelected = model.filteredRows.length > 0 && selectedRows.length === model.filteredRows.length;
-  const columnCount = headers.length + Number(hasActions) + Number(enableEmail);
+  const selectedRowIds = [...selected];
+  const selectedLoadedRows = (props.data ?? []).filter(row => selected.has(identify(row)));
+  const loadedIds = new Set(identities.values());
+  const bulkContext = {
+    selectedRowIds, selectedRows: selectedLoadedRows, selectedCount: selected.size,
+    unloadedSelectedRowIds: selectedRowIds.filter(id => !loadedIds.has(id)),
+    clearSelection: () => updateSelection(new Set()), disabled: loading || Boolean(error), state: model.state
+  };
+  const selectionRows = props.selectionScope === 'page' ? model.rows : model.filteredRows;
+  const selectedInScope = selectionRows.filter(row => selected.has(identify(row))).length;
+  const allSelected = selectionRows.length > 0 && selectedInScope === selectionRows.length;
+  const columnCount = headers.length + Number(hasActions) + Number(selectionEnabled);
   const sort = model.sorting[0];
 
   useEffect(() => {
@@ -59,42 +97,24 @@ export default function DynamicTable(props) {
   function toggleRow(row, checked) {
     const ids = new Set(selected);
     if (checked) ids.add(identify(row)); else ids.delete(identify(row));
-    setSelection({ data: props.data, ids });
+    updateSelection(ids);
   }
   const needsAllRows = serverSidePagination && model.count > model.filteredRows.length;
-  const exportFetch = needsAllRows ? async () => {
+  const exportFetch = needsAllRows ? async context => {
     if (!fetchAllForExport) throw new Error('Provide fetchAllForExport to export the full server result.');
     return fetchAllForExport({ orderBy: sort?.field ?? '', order: sort?.order ?? 'asc',
-      selectedColumns: model.sorting, searchText: model.searchText, columnFilters: model.columnFilters });
+      selectedColumns: model.sorting, searchText: model.searchText, columnFilters: model.columnFilters }, context);
   } : undefined;
 
-  const content = <Paper ref={ref} sx={{ width: '100%', overflow: 'auto', p: fullscreen ? 2 : 0 }}>
-    <Stack direction="row" spacing={1} sx={{ p: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-      {pageTitle && <Typography component="h2" variant="h6" sx={{ flexGrow: 1 }}>{pageTitle}</Typography>}
-      {(props.searchByText || props.enableSearch) && <Search searchText={model.searchText}
-        handleSearchTextChange={event => model.update({ searchText: event.target.value, page: 0 })} />}
-      {props.enableDensePadding && <IconButton aria-label="Dense padding" onClick={() => setDense(!dense)}><DensityMediumIcon /></IconButton>}
-      {props.enableMultiColumnSort && <MultiColumnSort headers={headers.filter(h => h.sortable !== false)}
-        selectedColumns={model.sorting} handleSortChange={sorting => model.update({ sorting, page: 0 })} />}
-      {props.enableExport && <ExportOptions headers={headers} data={model.filteredRows} pageTitle={pageTitle}
-        fetchAllRows={exportFetch} exportOptions={props.exportOptions} exportHandlers={props.exportHandlers}
-        state={{ page: model.page, rowsPerPage: model.rowsPerPage, sorting: model.sorting,
-          searchText: model.searchText, columnFilters: model.columnFilters }} disabled={loading || Boolean(error)} />}
-      {props.enableThemes && <ThemeSelector currentTheme={theme} handleThemeChange={setTheme} />}
-      {props.enableFullScreenOption && <IconButton aria-label="Toggle fullscreen" onClick={toggleFullscreen}>
-        {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}</IconButton>}
-      {enableEmail && <IconButton aria-label="Send email" disabled={!onEmail || loading || Boolean(error)}
-        onClick={() => onEmail(selectedRows.length ? selectedRows : model.filteredRows)}><EmailIcon /></IconButton>}
-      {props.renderToolbar?.({ ...model, selectedRows })}
-    </Stack>
-    {fullscreenError && <Alert severity="warning" onClose={() => setFullscreenError('')}>{fullscreenError}</Alert>}
-    {error && <Alert severity="error">{error instanceof Error ? error.message : String(error)}</Alert>}
-    {loading && <LinearProgress aria-label="Loading rows" />}
-    <TableContainer sx={{ maxHeight: props.maxHeight }}>
-      <Table stickyHeader={props.stickyHeader} size={dense ? 'small' : 'medium'}
-        aria-label={props['aria-label'] ?? (pageTitle || 'Data table')} aria-busy={loading}>
-        <TableHead><StyledTableRow>
-          {headers.map(header => <StyledTableCell key={header.field} style={{ width: header.width }}
+  function toggleAllRows(checked) {
+    const ids = new Set(selected);
+    selectionRows.forEach(row => checked ? ids.add(identify(row)) : ids.delete(identify(row)));
+    updateSelection(ids);
+  }
+  const selectionHeader = (<Cell key="selection-column"><Checkbox slotProps={{ input: { 'aria-label': selectAllLabel } }} disabled={loading || Boolean(error)} checked={allSelected}
+            indeterminate={selectedInScope > 0 && !allSelected} onChange={event => toggleAllRows(event.target.checked)} />{selectionLabel}</Cell>);
+  const headerCells = [
+          ...headers.map(header => <Cell {...slotProps.cell} key={`column-${header.field}`} style={{ width: header.width }}
             align={header.align} sortDirection={sort?.field === header.field ? sort.order : false}>
             {header.sortable === false ? header.label : <TableSortLabel active={sort?.field === header.field}
               direction={sort?.field === header.field ? sort.order : 'asc'} onClick={() => model.update({ page: 0,
@@ -102,41 +122,82 @@ export default function DynamicTable(props) {
               {header.label}
             </TableSortLabel>}
             {props.tooltipFields?.[header.field] && <Tooltip title={props.tooltipFields[header.field].join(', ')}>
-              <IconButton size="small" aria-label={`About ${header.label}`}><InfoIcon fontSize="small" /></IconButton>
+              <IconButton size="small" aria-label={labels.about(header.label)}><InfoIcon fontSize="small" /></IconButton>
             </Tooltip>}
-            {enableColumnFilters && header.filterable !== false && <TextField size="small" label={`Filter ${header.label}`}
+            {enableColumnFilters && header.filterable !== false && <TextField size="small" label={labels.filter(header.label)}
               value={model.columnFilters[header.field] ?? ''} onChange={event => model.update({ page: 0,
                 columnFilters: { ...model.columnFilters, [header.field]: event.target.value } })} />}
-          </StyledTableCell>)}
-          {hasActions && <StyledTableCell>{props.actionsColumnLabel ?? 'Actions'}</StyledTableCell>}
-          {enableEmail && <StyledTableCell><Checkbox aria-label="Select all emails" checked={allSelected}
-            indeterminate={selectedRows.length > 0 && !allSelected} onChange={event =>
-              setSelection({ data: props.data, ids: new Set(event.target.checked ? model.filteredRows.map(identify) : []) })} />Email</StyledTableCell>}
-        </StyledTableRow></TableHead>
-        <TableBody>
+          </Cell>),
+          ...(hasActions ? [<Cell key="row-actions">{props.actionsColumnLabel ?? labels.actions}</Cell>] : [])
+
+  ];
+  const renderSelectionCell = (row, index) => (<Cell key="selection-column"><Checkbox slotProps={{ input: { 'aria-label': props.enableRowSelection ? labels.selectRow(index + 1) : labels.selectEmailRow(index + 1) } }} disabled={loading || Boolean(error)}
+              checked={selected.has(identify(row))} onChange={event => toggleRow(row, event.target.checked)} /></Cell>);
+  const controls = {
+    search: ((props.searchByText || props.enableSearch) && <Search labels={labels} searchText={model.searchText}
+        handleSearchTextChange={event => model.update({ searchText: event.target.value, page: 0 })} />),
+    density: (props.enableDensePadding && <IconButton aria-label={labels.densePadding} onClick={() => setDense(!dense)}><DensityMediumIcon /></IconButton>),
+    sort: (props.enableMultiColumnSort && <MultiColumnSort labels={labels} headers={headers.filter(h => h.sortable !== false)}
+        selectedColumns={model.sorting} handleSortChange={sorting => model.update({ sorting, page: 0 })} />),
+    export: (props.enableExport && <ExportOptions labels={labels} headers={headers} data={model.filteredRows} pageTitle={pageTitle}
+        fetchAllRows={exportFetch} onExportStart={props.onExportStart} onExportComplete={props.onExportComplete}
+        onExportError={props.onExportError} onExportCancel={props.onExportCancel} exportOptions={props.exportOptions} exportHandlers={props.exportHandlers}
+        state={{ page: model.page, rowsPerPage: model.rowsPerPage, sorting: model.sorting,
+          searchText: model.searchText, columnFilters: model.columnFilters }} disabled={loading || Boolean(error)} />),
+    themes: (props.enableThemes && <ThemeSelector labels={labels} currentTheme={theme} handleThemeChange={setTheme} />),
+    fullscreen: (props.enableFullScreenOption && <IconButton aria-label={labels.fullscreen} onClick={toggleFullscreen}>
+        {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}</IconButton>),
+    bulkActions: (props.renderBulkActions ? props.renderBulkActions(bulkContext) : (enableEmail && <IconButton aria-label={labels.sendEmail} disabled={!onEmail || loading || Boolean(error)}
+        onClick={() => onEmail(selectedRows.length ? selectedRows : model.filteredRows)}><EmailIcon /></IconButton>)),
+    custom: (props.renderToolbar?.({ ...model, selectedRows, selection: bulkContext })),
+  };
+  const arrangedControls = arrangeToolbarControls(controls, props.toolbarAlignment, props.toolbarPositions);
+  const firstRight = arrangedControls.findIndex(control => control.side === 'right');
+  const content = <Root {...slotProps.root} ref={ref} sx={[{ width: '100%', overflow: 'auto', p: fullscreen ? 2 : 0 }, slotProps.root?.sx ?? {}]}>
+    <Toolbar {...slotProps.toolbar} direction="row" spacing={1} sx={[{ p: 1, alignItems: 'center', flexWrap: 'wrap' }, slotProps.toolbar?.sx ?? {}]}>
+      {pageTitle && <Typography component="h2" variant="h6" sx={{ flexShrink: 0 }}>{pageTitle}</Typography>}
+      {arrangedControls.map(({ id, node, side }, index) => <React.Fragment key={id}>
+        {index === firstRight && <Box aria-hidden="true" sx={{ flexGrow: 1 }} />}
+        <Box data-table-toolbar-control={id} data-table-toolbar-side={side}
+          sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>{node}</Box>
+      </React.Fragment>)}
+    </Toolbar>
+    {fullscreenError && <Alert severity="warning" onClose={() => setFullscreenError('')}>{fullscreenError}</Alert>}
+    {error && <Alert severity="error">{error instanceof Error ? error.message : String(error)}</Alert>}
+    {loading && <LinearProgress aria-label={labels.loading} />}
+    {model.sorting.length > 0 && <Box component="span" role="status" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }}>{labels.sortSummary(model.sorting)}</Box>}
+    <TableContainer sx={{ maxHeight: props.maxHeight }}>
+      <TableComponent {...slotProps.table} stickyHeader={props.stickyHeader} size={dense ? 'small' : 'medium'}
+        aria-label={props['aria-label'] ?? (pageTitle || labels.table)} aria-busy={loading}>
+        <Head {...slotProps.header}><Row>
+          {selectionEnabled ? insertSelectionCell(headerCells, selectionHeader, props.selectionColumnPosition) : headerCells}
+        </Row></Head>
+        <Body {...slotProps.body}>
           {!error && model.rows.map((row, index) => {
-            const rowId = getRowId ? getRowId(row) : getByPath(row, uniqueField || 'id') ?? index;
-            return <StyledTableRow key={rowId} hover>
-            {headers.map(header => <StyledTableCell key={header.field} align={header.align}>
+            const rowId = identify(row);
+            const cells = [
+            ...headers.map(header => <Cell {...slotProps.cell} key={`column-${header.field}`} align={header.align}>
               {header.renderCell ? header.renderCell({ row, value: getColumnValue(row, header), rowIndex: index, rowId }) : getColumnText(row, header)}
-            </StyledTableCell>)}
-            {hasActions && <StyledActionTableCell>
+            </Cell>),
+            ...(hasActions ? [<ActionCell key="row-actions" {...slotProps.actionCell}>
               {props.renderRowActions ? props.renderRowActions({ row, rowIndex: index, rowId }) :
                 renderLegacyRowActions({ row, actions, icons: props.showActionIcons, visibility: props.actionVisibilityRules })}
-            </StyledActionTableCell>}
-            {enableEmail && <StyledTableCell><Checkbox aria-label={`Select email row ${index + 1}`}
-              checked={selected.has(identify(row))} onChange={event => toggleRow(row, event.target.checked)} /></StyledTableCell>}
-          </StyledTableRow>;
+            </ActionCell>] : [])
+
+            ];
+            return <Row {...slotProps.row} key={rowId} selected={selectionEnabled && selected.has(rowId)} hover>
+            {selectionEnabled ? insertSelectionCell(cells, renderSelectionCell(row, index), props.selectionColumnPosition) : cells}
+          </Row>;
           })}
-          {!loading && !error && model.rows.length === 0 && <StyledTableRow><StyledTableCell colSpan={Math.max(1, columnCount)} align="center">
+          {!loading && !error && model.rows.length === 0 && <Row><Cell colSpan={Math.max(1, columnCount)} align="center">
             {emptyDataMessage}
-          </StyledTableCell></StyledTableRow>}
-        </TableBody>
-      </Table>
+          </Cell></Row>}
+        </Body>
+      </TableComponent>
     </TableContainer>
-    <CustomTablePagination count={model.count} page={model.page} rowsPerPage={model.rowsPerPage}
+    <Footer {...slotProps.footer} labels={labels} count={model.count} page={model.page} rowsPerPage={model.rowsPerPage}
       rowsPerPageOptions={props.rowsPerPageOptions} onPageChange={page => model.update({ page })}
       onRowsPerPageChange={event => model.update({ rowsPerPage: Number(event.target.value), page: 0 })} />
-  </Paper>;
-  return props.enableThemes ? <ThemeProvider theme={themes[theme]}>{content}</ThemeProvider> : <Box>{content}</Box>;
+  </Root>;
+  return props.enableThemes && theme !== 'default' ? <ThemeProvider theme={themes[theme]}>{content}</ThemeProvider> : <Box>{content}</Box>;
 }

@@ -36,7 +36,7 @@ Consumers install this package and satisfy its peer dependencies:
 | `@emotion/react` | `^11.14.0` |
 | `@emotion/styled` | `^11.14.1` |
 
-The package provides ES module imports. Its entry has a `'use client'` directive for Next.js integration. Place interactive table usage in a client component. XLSX and PDF engines load when those formats are requested. Declared peer ranges do not mean every version combination has been tested.
+The package provides ES module imports and declaration files for root and helper subpaths. Its root entry has a `'use client'` directive for Next.js integration. Place interactive table usage in a client component. TypeScript declarations are included. Use `@company/mui-data-table/core`, `/spring`, or `/exports` for independent helper imports; these entries have no client directive. Only browser-download functions in `/exports` require DOM APIs. XLSX and PDF engines load when those formats are requested. Declared peer ranges do not mean every version combination has been tested.
 
 ```jsx
 'use client';
@@ -74,7 +74,7 @@ export default function Customers() {
 
 ## Individual examples
 
-The [example catalog](examples/nextjs-demo/README.md) contains **53 standalone examples**, each with its own source file, route, description and expandable source view. Remote examples use a simulated backend; email examples only preview recipients.
+The [example catalog](examples/nextjs-demo/README.md) contains **66 standalone examples**, each with its own source file, route, description and expandable source view. Remote examples use a simulated backend; email examples only preview recipients.
 
 ```sh
 npm run build
@@ -91,7 +91,7 @@ All imports below use `@company/mui-data-table`; there is no default package exp
 | Category | Named exports |
 |---|---|
 | React component | `DynamicTable` |
-| React state hook | `useTableModel` |
+| React state hook | `useTableModel`, `createTableState` |
 | Pure row processing | `buildRowModel` |
 | Column helpers | `normalizeColumns`, `getColumnValue`, `getColumnText`, `headersToExportColumns` |
 | Export projection | `getExportData` |
@@ -100,7 +100,7 @@ All imports below use `@company/mui-data-table`; there is no default package exp
 | Blob builders | `createXlsxBlob`, `createPdfBlob` |
 | Download/endpoint helpers | `downloadBlob`, `exportWithEndpoint` |
 | Handler map | `defaultExportHandlers` |
-| Spring Data adapters | `createSpringDataSource`, `normalizeSpringPage` |
+| Spring Data adapters | `createSpringDataSource`, `normalizeSpringPage`, `toSpringRequest`, `fetchAllSpringRows` |
 
 ## DynamicTable parameters
 
@@ -117,7 +117,7 @@ All imports below use `@company/mui-data-table`; there is no default package exp
 | `pageTitle` | `string` | `''` | Visible title, default accessible name and export filename/title source. |
 | `aria-label` | `string` | `pageTitle` or `'Data table'` | Accessible table name; does not replace the visible title. |
 
-Without `getRowId`, row keys and renderer `rowId` fall back from `uniqueField`/`id` to the index within the displayed page. Email selection instead falls back to row-object identity. Supply stable IDs when using stateful row controls. A supplied `getRowId` must itself return valid identities; its result is not repaired by the fallback.
+Interactive rows (email selection, action controls, or custom cells) require a unique, stable string or finite numeric ID via `getRowId`, `uniqueField`, or `id`. Duplicate IDs are rejected. Noninteractive rows may fall back to their original input index. A supplied `getRowId` must return valid IDs even for noninteractive rows.
 
 ### Search, filters, sorting and pagination
 
@@ -136,9 +136,29 @@ Without `getRowId`, row keys and renderer `rowId` fall back from `uniqueField`/`
 | `totalCount` | `integer` | server: `data.length`; local: derived | Total matching server rows. Must be nonnegative if supplied. Does not override local counts. |
 | `onPageChangeRequest` | `(query) => void` | unset | Server-mode query notification on page/size/search/filter/sort updates. See [query shape](#query-shape). |
 
-`orderBy`, `order` and `initialRowsPerPage` initialize state; changing them later does not control it. Search/filter/sort/size changes reset the page unless an explicit page is included in a hook update. Header clicks replace the sort list with one column and alternate ascending/descending. Use the multi-sort menu to retain multiple priority columns.
+`orderBy`, `order` and `initialRowsPerPage` initialize legacy state; native `initialState` takes precedence and native `state` controls its supplied slices. Legacy defaults initialize uncontrolled slices. Changing these legacy initial props later does not control state. Search/filter/sort/size changes reset the page unless an explicit page is included in a hook update. Header clicks replace the sort list with one column and alternate ascending/descending. Use the multi-sort menu to retain multiple priority columns.
 
-When `currentPage` is supplied, the parent must apply page changes. `onPageChangeRequest` is emitted only in server mode; client mode has no independent page-change callback. For parent-managed paging with the built-in pager, supply a page of rows through the server contract, as shown in the [controlled-page example](examples/nextjs-demo/examples/controlled-page.jsx).
+When `currentPage` is supplied, the parent must apply page changes. Native `state.page` takes precedence over this legacy alias. Use `onStateChange` to observe proposals in both modes; `onPageChangeRequest` remains a server-only compatibility callback. See the [controlled-page example](examples/nextjs-demo/examples/controlled-page.jsx).
+
+### Controlled query state
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `state` | `Partial<TableState>` | unset | Supplied keys are parent-controlled; absent keys remain internal. |
+| `initialState` | `Partial<TableState>` | defaults below | Initial uncontrolled state; takes precedence over legacy initial props. Changes after mount are ignored. |
+| `onStateChange` | `(next, event) => void` | unset | Proposed query state after a meaningful user action, in client or server mode. |
+| `onQueryChange` | `(next, event) => void` | unset | Query-only notification in either mode. Use this OR `onStateChange` to start fetching, rather than fetching from both. |
+
+`TableState` contains `page`, `rowsPerPage`, `searchText`, `columnFilters`, and `sorting`. Controlled slices render the parent's value until it accepts a proposal. Keep the set of controlled keys fixed during a mount; remount to change ownership. The hook composes batched proposals without invoking callbacks from React state updater functions or effects. Mounts, prop updates, and no-op transitions do not emit events. A patch containing query criteria still requests a page reset unless page is explicitly supplied.
+
+```jsx
+const [state, setState] = useState(() => createTableState({ rowsPerPage: 10 }));
+<DynamicTable headers={headers} data={customers} state={state} onStateChange={setState} />
+// Parent-driven reset, including search/filter/sort/page:
+// setState(createTableState({ rowsPerPage: 10 }));
+```
+
+`event` is `{ type, changedKeys, previousState }`. `type` is the changed state key when exactly one key changed, otherwise `'query'`. `changedKeys` includes effective page resets. Multiple callbacks can observe the same action, but only one should own the remote request. None of these state APIs includes selection or presentation settings.
 
 ### Caller-defined and descriptor actions
 
@@ -172,7 +192,85 @@ These remain available for existing callers. Each enabled action receives the or
 | `enableEmail` | `boolean` | `false` | Add row/header checkboxes and the Send email button. |
 | `onEmail` | `(rows: object[]) => void` | unset | Receive selected matching rows; if none are selected among matching rows, receive all matching loaded rows. |
 
-The header checkbox covers all matching local rows, across client pages, or only the loaded rows in server mode. Selection resets when the `data` array reference changes. The button is disabled without `onEmail`, during loading, or on error. The table does not send email.
+The header checkbox covers all matching local rows, across client pages, or only the loaded rows in server mode. By default selection resets when the `data` array reference changes. Opt into dataset-based retention with `selectionReset`. Controlled selection is always owned by the parent. The button is disabled without `onEmail`, during loading, or on error. The table does not send email.
+
+### Selection ownership
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `enableRowSelection` | `boolean` | `false` | General row-selection checkboxes, independent of email. |
+| `selectionColumnPosition` | `'first'`, `'last'` or integer | `'first'` | Insert checkboxes at the first/last column or a zero-based position, including the optional row-action column. Header/body order stays aligned. |
+| `selectionColumnLabel` | `ReactNode` | `'Selection'` or legacy `'Email'` | Header for the selection column. |
+| `selectedRowIds` | `Array<string or number>` | internal | Controlled IDs; the parent accepts updates. |
+| `initialSelectedRowIds` | ID array | `[]` | Initial uncontrolled IDs. |
+| `onSelectionChange` | `(ids) => void` | unset | Proposed ID array after a checkbox action. Does not trigger query callbacks. |
+| `selectionReset` | `'data'` or `'dataset'` | `'data'` | Reset on a new data reference, or retain across refreshes until dataset key changes. |
+| `datasetKey` | `string or number` | unset | Identity of the dataset for uncontrolled reset behavior. A changed key clears uncontrolled selection. Parents must clear controlled IDs themselves. |
+| `selectionScope` | `'page'` or `'filtered'` | `'filtered'` | Rows affected by the header checkbox. Server scope is always limited to supplied rows. Existing IDs outside the scope are retained. |
+
+Checkboxes now appear first by default, including in legacy email mode. Set `selectionColumnPosition="last"` to restore the earlier placement. Numeric positions must be within `0..headers.length + Number(hasRowActions)`; invalid positions throw. Positioning does not pin the checkbox column.
+
+General checkboxes are enabled through `enableRowSelection`. Legacy `enableEmail` also enables checkboxes; use both to add email delivery integration to general selection. Selected IDs are available through `onSelectionChange`. Bulk email receives only matching loaded row objects, not unseen IDs.
+
+### Generic bulk actions
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `renderBulkActions` | `(context) => ReactNode` | unset | Caller-owned bulk buttons or menus. Combine with `enableRowSelection`. Replaces the legacy email button when supplied. |
+
+No remove/delete/email behavior is hardcoded into the generic renderer. The application owns its operation, authorization, confirmation, pending state and errors. Return `null` to hide actions. The renderer is invoked even with no selection so it can show disabled controls.
+
+| Context field | Type | Meaning |
+|---|---|---|
+| `selectedRowIds` | ID array | Every selected ID, including hidden/filtered and retained remote-page selections. |
+| `selectedRows` | row array | Selected rows present anywhere in the current `data` array, even if hidden by local filters. This is not an all-server-results fetch. |
+| `selectedCount` | number | Number of selected IDs; may exceed `selectedRows.length` in server mode. |
+| `unloadedSelectedRowIds` | ID array | Selected IDs absent from the loaded `data` array. Useful when a handler requires row objects rather than IDs. |
+| `clearSelection()` | function | Clear internal selection, or propose `[]` through `onSelectionChange` in controlled mode. |
+| `disabled` | boolean | Table is loading or errored; application buttons should honor this and their own pending state. |
+| `state` | `TableState` | Current query state for application-owned handlers. |
+
+```jsx
+<DynamicTable
+  headers={headers}
+  data={customers}
+  getRowId={row => row.id}
+  enableRowSelection
+  selectionColumnPosition="first"
+  renderBulkActions={({ selectedRowIds, selectedRows, selectedCount, clearSelection, disabled }) => (
+    <Stack direction="row" spacing={1}>
+      <Button disabled={disabled || selectedCount === 0} onClick={async () => {
+        await removeCustomers(selectedRowIds);
+        clearSelection();
+      }}>Remove selected</Button>
+      <Button disabled={disabled || selectedCount === 0}
+        onClick={() => previewEmail(selectedRows)}>Email selected</Button>
+    </Stack>
+  )}
+/>
+```
+
+The consuming component supplies MUI `Button`/`Stack`, rows and handlers; its handlers own error handling and pending state. Clear selection after a successful operation. Do not treat unloaded IDs as loaded records. The [bulk-actions example](examples/nextjs-demo/examples/bulk-actions.jsx) operates on synthetic local data and previews email without sending it.
+
+Legacy `enableEmail`/`onEmail` continue to work when no `renderBulkActions` is provided. Legacy no-selection email behavior remains all matching loaded rows; generic actions have no such automatic fallback.
+
+### Toolbar placement
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `toolbarAlignment` | `'left'` or `'right'` | `'left'` | Default side for all enabled toolbar controls, including bulk and custom content. |
+| `toolbarPositions` | `Partial<Record<control, 'left' or 'right'>>` | `{}` | Per-control overrides of the default side. Unknown controls or unsupported positions throw. |
+
+Control keys are `search`, `density`, `sort`, `export`, `themes`, `fullscreen`, `bulkActions`, and `custom` (the `renderToolbar` result). Email's compatibility button belongs to `bulkActions`. The title remains at the beginning without forcing controls to the opposite side. Left controls precede right controls in DOM/keyboard order; their existing relative order is retained within each side. Sides follow the layout's reading direction in RTL themes.
+
+```jsx
+<DynamicTable headers={headers} data={customers} searchByText enableExport enableThemes
+  toolbarAlignment="left"
+  toolbarPositions={{ export: 'right', themes: 'right', bulkActions: 'right' }}
+/>
+```
+
+Changing alignment retains control instances: search input state and active export jobs are preserved. Custom toolbar slots must retain the supplied children and their flex layout to use built-in positioning. `renderToolbar` also receives the generic context as `context.selection`; its original `context.selectedRows` still means selected *matching* rows for compatibility.
 
 ### Export controls
 
@@ -180,10 +278,10 @@ The header checkbox covers all matching local rows, across client pages, or only
 |---|---|---|---|
 | `enableExport` | `boolean` | `false` | Show the export menu. Disabled during loading/error and while an export runs. |
 | `exportOptions` | `{csv?, txt?, xlsx?, pdf?, json?}` | CSV/TXT/XLSX/PDF on; JSON off | Boolean flags for each menu format. Omitted flags retain their defaults. |
-| `exportHandlers` | `Record<format, (context) => void or Promise<void>>` | built-in handlers | Override individual format handlers. Keys: `csv`, `txt`, `xlsx`, `pdf`, `json`. |
-| `fetchAllForExport` | `(query) => object[] or Promise<object[]>` | unset | Full matching-row resolver when server `totalCount` exceeds the loaded-row count. |
+| `exportHandlers` | `Record<format, ExportHandler>` | built-in handlers | Override individual format handlers. Keys: `csv`, `txt`, `xlsx`, `pdf`, `json`. |
+| `fetchAllForExport` | `(query, job) => object[] or Promise<object[]>` | unset | Full matching-row resolver when server `totalCount` exceeds the loaded-row count. |
 
-The menu exports matching, sorted rows across all client pages. It ignores email selection. A partial server dataset requires `fetchAllForExport`; a missing resolver or rejected export produces an error snackbar. The resolver runs before custom format handlers. See [export callback shapes](#export-callback-shapes).
+The menu exports matching, sorted rows across all client pages. It ignores email selection. A partial server dataset requires `fetchAllForExport`; a missing resolver or rejected export produces an error snackbar. The resolver runs before row-based format handlers. Endpoint handlers skip it. See [export callback shapes](#export-callback-shapes).
 
 ### Presentation and feedback
 
@@ -196,11 +294,25 @@ The menu exports matching, sorted rows across all client pages. It ignores email
 | `maxHeight` | `number or CSS string` | unset | Maximum scrolling body-container height. |
 | `enableDensePadding` | `boolean` | `false` | Show a density toggle; initial row size is medium. |
 | `enableFullScreenOption` | `boolean` | `false` | Show browser fullscreen controls. Unsupported/rejected fullscreen shows feedback. |
-| `enableThemes` | `boolean` | `false` | Show the library theme selector: `default`, `grey`, `blue`, `light`; initial selection is `default`. Otherwise inherit the parent MUI theme. |
+| `enableThemes` | `boolean` | `false` | Show the library theme selector: `default`, `grey`, `blue`, `light`; initial selection is `default`, which inherits the parent theme (standard MUI when none is supplied). Other selections opt into a preset. |
 | `tooltipFields` | `Record<field, string[]>` | no tooltips | Header information buttons; array items are joined with commas. |
 | `renderToolbar` | `(context) => ReactNode` | unset | Append controls/content to the existing toolbar. Does not replace the default toolbar. |
 
-Unknown props are not automatically forwarded to MUI components. In particular, there are currently no generic `sx`, `className`, `slots` or `components` table props. Pagination remains visible for empty and nonempty results.
+Unknown props are not automatically forwarded to MUI components. Use the explicit `slots`, `slotProps` and `labels` contracts below. Pagination remains visible for empty and nonempty results.
+
+### Component slots and localization
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `slots` | object of React element/component types | native wrappers | Override `root`, `table`, `toolbar`, `header`, `body`, `row`, `cell`, `actionCell`, or `footer`. |
+| `slotProps` | object keyed by slot name | `{}` | Additional wrapper props. Managed table/query values retain precedence. Root/toolbar `sx` is composed with defaults. |
+| `labels` | `Partial<TableLabels>` | English defaults | Override UI strings and formatters listed below. |
+
+Slots must forward provided children, props and refs where applicable and preserve native table semantics. Header/body/row/cell slots replace wrappers around the working controls. Footer receives `count`, `page`, `rowsPerPage`, change callbacks, size options and labels. Action cells are separate from data cells. `renderToolbar` still appends content; the toolbar slot controls its wrapper.
+
+String labels: `selection`, `selectAllRows`, `table`, `empty`, `actions`, `email`, `sendEmail`, `selectAllEmails`, `search`, `openSearch`, `closeSearch`, `densePadding`, `fullscreen`, `loading`, `sortMenu`, `clearSorting`, `themeSelector`, `rowsPerPage`, `firstPage`, `previousPage`, `nextPage`, `lastPage`, `exportMenu`, `exporting`, `cancelExport`.
+
+Formatter labels: `selectRow(index)`, `selectEmailRow(index)`, `filter(columnLabel)`, `about(columnLabel)`, `sortSummary(sorting)`, `displayedRows({from,to,count})`, `exportProgress({loaded,total})`. Labels cover built-in control names; column labels, action labels, format names, preset names and application error messages remain application content. Translate size-option text such as All via `rowsPerPageOptions`.
 
 ## Column parameters
 
@@ -216,6 +328,9 @@ Unknown props are not automatically forwarded to MUI components. In particular, 
 | `separator` | `string` | `''` | Join composite `fields`. |
 | `suffix` | `string` | `''` | Append after composite or single-column text. |
 | `valueGetter` | `(row) => value` | dot-path/composite accessor | Override the accessed value. Takes precedence over `fields`. |
+| `dataType` | `'auto'`, `'number'`, `'string'`, `'boolean'`, `'date'` | `'auto'` | Comparison policy; typed invalid values share the null bucket. |
+| `nulls` | `'first'` or `'last'` | `'last'` | Position invalid/nullish values independently of ascending/descending direction. |
+| `locale` | `string or string[]` | runtime locale | Locale for default text comparison. |
 | `dateFormat` | `string` | `'MM/dd/yyyy'` | Format Date/recognized ISO date values. Uses date-fns-style tokens; `YYYY`/`DD` are normalized to `yyyy`/`dd`. |
 | `renderCell` | `({row, value, rowIndex, rowId}) => ReactNode` | formatted accessor text | Change cell presentation only. |
 | `sortable` | `boolean` | `true` | Allow header/menu sorting and local comparator processing. |
@@ -224,11 +339,13 @@ Unknown props are not automatically forwarded to MUI components. In particular, 
 | `sortComparator` | `(a, b) => number` | built-in comparison | Compare two accessed values, not row wrappers; negative/zero/positive for ascending order. The engine applies direction. |
 | `filterFn` | `(value, filter, row) => boolean` | case-insensitive substring | Replace local matching for a nonempty filter. Built-in UI supplies string filters. |
 | `enableExport` | `boolean` | `true` | Include the column in every built-in export format. |
-| `exportValue` | `(row, index) => value` | `getColumnText(row, column)` | Export-specific value, independent of rendered React nodes. `index` is within the exported row collection. |
+| `exportValue` | `(row, index) => value` | `getColumnValue(row, column)` | Export-specific value, independent of rendered React nodes. `index` is within the exported row collection. |
 | `width` | `number or CSS width string` | unset | Header-cell width; numeric values use pixels. |
 | `align` | `'left'`, `'center'`, `'right'`, `'justify'` or `'inherit'` | MUI default | Header/body alignment. |
 
 Column identities must be unique after resolving `field ?? id`. A display column forcibly disables `sortable`, `searchable`, `filterable` and `enableExport` even if those flags are supplied as `true`; its `valueGetter` is not used. Use `renderCell` for its content.
+
+Default sorting uses a deterministic type order (numbers, booleans, valid dates, text, other stringified values) and a separate null bucket. Numeric strings compare numerically in auto mode; empty strings and booleans are not coerced to numbers. Custom comparators own their value/null policy and return ascending comparison results.
 
 Default local search uses OR across searchable data columns. Column filters use AND and combine with search. Nullish/empty-string filters are inactive. Composite-column sorting uses its composed text; single-column sorting uses the raw accessed value. Keep each column's value types consistent or provide a comparator.
 
@@ -255,7 +372,7 @@ The last snippet assumes `Button` and `openCustomer` are supplied by the consumi
 |---|---|
 | `row` | Original input object, without a table-engine wrapper. |
 | `rowIndex` | Zero-based position in the displayed page; changes after sorting/paging. |
-| `rowId` | `getRowId(row)`, or the configured identity path, or displayed-index fallback. |
+| `rowId` | `getRowId(row)`, or the configured identity path, or original-input-index fallback for noninteractive rows. |
 | `value` | Accessed column value; present only for cell rendering. Undefined for display columns. |
 
 Return `null`/`false` from a row-action renderer when no actions apply; the empty cell remains for alignment. Keep hooks in a child component returned by the renderer rather than calling hooks inside the callback itself.
@@ -314,11 +431,11 @@ The callback is not called on mount. The caller performs initial fetching and su
 
 ### Toolbar context
 
-`renderToolbar(context)` receives all fields returned by `useTableModel`, plus `selectedRows`. Thus it includes `page`, `rowsPerPage`, `searchText`, `columnFilters`, `sorting`, `rows`, `filteredRows`, `count`, `update` and `selectedRows`. The selection array contains selected matching loaded rows, and can be empty even when email's no-selection behavior would use all matching rows.
+`renderToolbar(context)` receives all fields returned by `useTableModel`, plus `selectedRows` and `selection` (the full generic bulk-action context). Thus it includes `page`, `rowsPerPage`, `searchText`, `columnFilters`, `sorting`, `rows`, `filteredRows`, `count`, `update` and `selectedRows`. The context also includes native `state`. The selection array contains selected matching loaded rows, and can be empty even when email's no-selection behavior would use all matching rows.
 
 ### Export callback shapes
 
-`fetchAllForExport(query)` receives:
+`fetchAllForExport(query, job)` receives:
 
 ```js
 {
@@ -330,7 +447,7 @@ The callback is not called on mount. The caller performs initial fetching and su
 }
 ```
 
-It must return an array or a promise resolving to an array. It receives neither pagination nor an AbortSignal. It is invoked only when server `totalCount` exceeds the loaded row count. Preserve sort/filter criteria when resolving all rows.
+It must return an array or a promise resolving to an array. It receives no pagination in query. Its second argument is `{ signal, onProgress }`, where progress accepts `{ loaded, total }`. Forward these to the source/helper; cancellation is checked before invoking the format handler. It is invoked only when server `totalCount` exceeds the loaded row count. Preserve sort/filter criteria when resolving all rows.
 
 `exportHandlers[format](context)` receives:
 
@@ -350,9 +467,19 @@ It must return an array or a promise resolving to an array. It receives neither 
 }
 ```
 
-Return `void` or `Promise<void>`; rejection/throwing produces an error snackbar. Filenames use the sanitized `pageTitle` (or `table`) plus a UTC timestamp and extension. The menu locks until resolution and handler completion. It does not interpret a handler's `false` return as cancellation; a custom handler can simply omit downloading.
+Return `void` or `Promise<void>`; rejection/throwing produces an error snackbar. Filenames use the sanitized `pageTitle` (or `table`) plus a UTC timestamp and extension. The menu locks until resolution and handler completion and displays Cancel export. Cancellation/unmount aborts the job, suppresses stale completion and prevents built-in downloads. Synchronous serialization cannot be interrupted mid-task; application handlers must observe the provided signal before their own side effects. It does not interpret a handler's `false` return as cancellation; a custom handler can simply omit downloading.
 
-For a direct endpoint download without first loading all rows as JSON, add a button through `renderToolbar` and call `exportWithEndpoint` from it.
+Export handler context also contains `signal` and `onProgress`. Existing handler functions remain row-based. To bypass row fetching, supply an endpoint descriptor:
+
+```jsx
+exportHandlers={{ xlsx: { mode: 'endpoint', handler: ({ state, signal }) =>
+  exportWithEndpoint({ url: '/api/customers/export', filename: 'customers.xlsx', method: 'POST', body: state, signal })
+} }}
+```
+
+An endpoint context has `rows: []`; use its snapshot `state`. A descriptor with `mode: 'rows'` behaves like a plain handler function.
+
+Lifecycle callbacks: `onExportStart(info)`, `onExportComplete({...info, rowCount})`, `onExportError(error, info)`, `onExportCancel(info)`. `info` contains `format`, `filename`, `state`; `rowCount` is undefined for endpoints. Cancellation does not emit an error or completion. Unmount suppresses subsequent callbacks. Lifecycle callbacks should not throw. Dates/objects inside filter state are subject to the immutable-input contract; replace them rather than mutate them while exporting.
 
 ## State hook: useTableModel
 
@@ -361,6 +488,10 @@ const model = useTableModel(options);
 ```
 
 A React hook; call it inside a component/custom hook.
+
+### createTableState(partial = {})
+
+Returns a validated query state with defaults `{ page: 0, rowsPerPage: 5, searchText: '', columnFilters: {}, sorting: [] }`, overridden by a partial object. Rejects unknown keys, unsafe/invalid pagination, non-string search, non-object filters and invalid/duplicate sort descriptors. Use it to initialize or reset controlled state.
 
 ### Options
 
@@ -375,6 +506,9 @@ A React hook; call it inside a component/custom hook.
 | `serverSidePagination` | `false` | Skip local data processing when true. |
 | `totalCount` | unset | Server total; nonnegative integer. |
 | `onPageChangeRequest` | unset | Same server query callback as DynamicTable. |
+| `state` | unset | Native partial controlled query state. |
+| `initialState` | defaults | Native initial uncontrolled query state. |
+| `onStateChange`, `onQueryChange` | unset | Query state/event notifications in both modes. |
 
 ### Returned model and update parameters
 
@@ -388,6 +522,7 @@ A React hook; call it inside a component/custom hook.
 | `searchText` | `string` | Current global query, initially `''`. |
 | `columnFilters` | `object` | Field-to-filter map, initially `{}`. |
 | `sorting` | `Array<{field, order}>` | Priority sorts; initially derived from `orderBy`/`order` or `[]`. |
+| `state` | `TableState` | Effective query state, including locally clamped page. |
 | `update(patch)` | function | Shallow-merge an update to query state. |
 | `update(previous => patch)` | function | Derive a shallow patch from the latest state, including earlier batched updates. |
 
@@ -426,8 +561,8 @@ The hook does not normalize columns, implement email selection, render controls 
 ### headersToExportColumns(headers)
 
 - **Parameter:** normalized UI columns.
-- **Returns:** standalone descriptors containing `id`, `header`, `enableExport` and `exportValue`. The fallback export value uses `getColumnText`; display columns are excluded.
-- This adapter preserves formatted text by default. Supply `exportValue` to retain numbers, booleans or Date objects in formats that support types.
+- **Returns:** standalone descriptors containing `id`, `header`, `enableExport` and `exportValue`. The fallback export value uses `getColumnValue`; display columns are excluded.
+- This adapter now preserves raw numbers, booleans and Date objects. To export display formatting, supply `exportValue: row => getColumnText(row, normalizedColumn)`. Composite values remain composed text. This is a deliberate migration change.
 
 ```js
 const columns = headersToExportColumns(normalizeColumns(headers));
@@ -475,6 +610,7 @@ const context = {
 | `columns` | `ExportColumn[]` | required | Export schema below. |
 | `title` | `string` | unset | Optional PDF heading. Other standalone formats ignore it. |
 | `filename` | `string` | per download function | Used only by file-download wrappers. |
+| `signal` | `AbortSignal` | unset | Cancellation check before generation/download; async wrappers check again after generation. |
 
 | ExportColumn parameter | Type | Default | Meaning |
 |---|---|---|---|
@@ -498,7 +634,7 @@ A leaf without `accessorKey`, `accessorFn` or `exportValue` is skipped. Group de
 | `rowsToTxt(context)` | Export context | Tab-separated text with headers and CRLF records; escapes embedded backslashes, tabs and line breaks. |
 | `rowsToJson(context)` | Export context | Indented JSON array string. Preserves JSON-compatible types, converts nullish cell values to `null`, and suffixes duplicate keys (`name_2`, etc.). |
 
-Dates become ISO strings in text formats; objects use JSON serialization. Inputs must be serializable: circular objects/BigInt can throw. The string serializers create no download. CSV formula guarding operates on serialized text, so even negative numeric text receives an apostrophe; use a typed XLSX cell when numeric preservation matters.
+Dates become ISO strings in text formats; objects use JSON serialization. Inputs must be serializable: circular objects/BigInt can throw. The string serializers create no download. CSV formula guarding protects formula-like strings, including full-width prefixes/control characters, while retaining numeric negative values as numbers.
 
 ### Browser file-download wrappers
 
@@ -561,7 +697,7 @@ The consuming code supplies `controller` and imports `exportWithEndpoint`.
 | `page.totalElements` | `number` | `0` if nullish |
 | `page.totalPages` | `number` | `0` if nullish |
 
-Returns `{ rows, rowCount, pageCount }`. This is shape adaptation, not response validation.
+Returns `{ rows, rowCount, pageCount }`. Validates that the response is an object, content is an array, and supplied totals are nonnegative safe integers. Missing/nullish fields retain the listed defaults. Invalid shapes throw `TypeError`/`RangeError`. For full exports, nonempty rows require accurate totals; missing totals cannot prove completeness.
 
 ### createSpringDataSource(options)
 
@@ -578,34 +714,88 @@ Returns an async `dataSource(request)` function:
 |---|---|---|---|
 | `pagination` | `{pageIndex, pageSize}` | required | Zero-based page index and backend-supported size. |
 | `pagination.pageIndex` | `integer` | required | Serialized as `page`. |
-| `pagination.pageSize` | `integer` | required | Serialized as `size`; the adapter does not translate `-1`. |
+| `pagination.pageSize` | `integer` | required | Serialized as `size`; `-1` is rejected. |
 | `sorting` | `Array<{id: string, desc: boolean}>` | `[]` | Serialized as repeated `sort=field,asc` / `sort=field,desc`, unless `mapSort` is supplied. |
 | `globalFilter` | `string` | `''` | Nonempty search query, serialized as `search`. |
 | `columnFilters` | `Array<{id: string, value}>` | `[]` | Non-nullish/nonempty values serialized as `filter.<id>=String(value)`. |
 | `signal` | `AbortSignal` | unset | Forwarded to the fetcher. |
 
-Resolves to `{ rows, rowCount, pageCount }` using `normalizeSpringPage`. Non-OK responses throw `Error('Table request failed (STATUS)')`; fetch/JSON errors propagate. Existing page/size/sort/search values are replaced. Filter parameters for IDs present in `columnFilters` are replaced or cleared; other base-URL filter parameters remain. Pass a cleared filter explicitly or use a clean base URL for dynamic filters. Objects/arrays are stringified rather than encoded as a typed range/filter protocol.
+Resolves to `{ rows, rowCount, pageCount }` using `normalizeSpringPage`. Page indexes must be nonnegative safe integers and sizes positive safe integers; invalid values fail before fetching. Cancellation is checked before/after the fetch and JSON parsing. Non-OK responses throw `Error('Table request failed (STATUS)')`; fetch/JSON errors propagate. Existing page/size/sort/search values are replaced. Filter parameters for IDs present in `columnFilters` are replaced or cleared; other base-URL filter parameters remain. Pass a cleared filter explicitly or use a clean base URL for dynamic filters. Objects/arrays are stringified rather than encoded as a typed range/filter protocol.
 
-The adapter request shape differs from the table's query shape. Map them explicitly:
+The native adapter request shape differs from the table query. Use `toSpringRequest` to map it, and reuse the same data source for exports:
 
-```js
-const dataSource = createSpringDataSource({ url: '/api/customers' });
-const controller = new AbortController();
-const query = {
-  page: 0, rowsPerPage: 10, sorting: [{ field: 'name', order: 'asc' }],
-  searchText: '', columnFilters: {}
-};
-const result = await dataSource({
-  pagination: { pageIndex: query.page, pageSize: query.rowsPerPage },
-  sorting: query.sorting.map(({ field, order }) => ({ id: field, desc: order === 'desc' })),
-  globalFilter: query.searchText,
-  columnFilters: Object.entries(query.columnFilters).map(([id, value]) => ({ id, value })),
-  signal: controller.signal
-});
-// result.rows → data; result.rowCount → totalCount
+```jsx
+const source = createSpringDataSource({ url: '/api/customers' });
+
+// Inside the consuming component's cancellable request effect:
+const result = await source(toSpringRequest(query, { signal: controller.signal }));
+// result.rows -> data; result.rowCount -> totalCount
+
+// In the rendered table:
+<DynamicTable
+  headers={headers}
+  data={result.rows}
+  totalCount={result.rowCount}
+  serverSidePagination
+  currentPage={query.page}
+  onPageChangeRequest={setQuery}
+  enableExport
+  fetchAllForExport={exportQuery => fetchAllSpringRows({
+    dataSource: source,
+    query: exportQuery,
+    pageSize: 500,
+    maxRows: 10000,
+    getRowId: row => row.id
+  })}
+/>
 ```
 
-Import `createSpringDataSource` from the package. The [Spring example](examples/nextjs-demo/examples/spring-adapter.jsx) demonstrates cancellation and stale-response protection with a mock fetcher. Applications own authorization, endpoint validation and dataset fetching.
+Import `createSpringDataSource`, `toSpringRequest`, `fetchAllSpringRows` and `DynamicTable`. The consuming component supplies its rows/query state, headers and controller. Create/memoize `source` once rather than during every render. The [Spring example](examples/nextjs-demo/examples/spring-adapter.jsx) shows the complete component with mock transport, cancellation, stale-response protection and full-result exports. Core table rendering remains backend-independent; applications choose the transport.
+
+### toSpringRequest(query = {}, options = {})
+
+Maps a DynamicTable query, including `fetchAllForExport` criteria, to the native adapter request.
+
+| Query parameter | Default | Mapping |
+|---|---|---|
+| `page` | `0` | `pagination.pageIndex`; nonnegative safe integer. |
+| `rowsPerPage` | `10` | `pagination.pageSize`, unless overridden by `options.pageSize`. |
+| `sorting` | `selectedColumns`, then single-sort fallback, then `[]` | Array of `{field, order}` becomes `{id: field, desc: order === 'desc'}`. An explicit empty array clears sorting. |
+| `selectedColumns` | unset | Compatibility sort-array alias when `sorting` is absent. |
+| `sortBy` / `orderBy` | unset | Single-sort fallback field; `sortBy` takes precedence when non-nullish. |
+| `sortDir` / `order` | `'asc'` | Fallback direction; `sortDir` takes precedence. |
+| `searchText` | `''` | `globalFilter`. |
+| `columnFilters` | `{}` | Field/value map becomes `[{id, value}]`. |
+
+| Options parameter | Default | Meaning |
+|---|---|---|
+| `signal` | unset | Copied to the request. |
+| `pageSize` | query size or `10` | Positive safe integer; allows a bounded export size even when UI size is `-1`. |
+
+Returns `{ pagination, sorting, globalFilter, columnFilters, signal }`. Throws for invalid page/size or non-array sorting. This maps table queries; do not pass an already-native Spring request to it.
+
+### fetchAllSpringRows(options)
+
+See the [standalone progress/cancel example](examples/nextjs-demo/examples/spring-export.jsx).
+
+Sequentially fetches from page zero until the advertised matching-row total has been received. Uses the same source/filter/sort mapping as page requests and returns one complete array, never an intentionally truncated result.
+
+| Parameter | Type | Default | Meaning |
+|---|---|---|---|
+| `dataSource` | `(request) => Promise<{rows, rowCount, pageCount?}>` | required | Usually the result of `createSpringDataSource`. Must return normalized pages. |
+| `query` | table/export query object | `{}` | Search, filters and sort criteria; its page is ignored. |
+| `pageSize` | positive safe integer | `500` | Bounded request size; backend-capped sizes are supported. |
+| `maxRows` | positive safe integer | `10000` | Reject a result whose advertised total exceeds this limit. |
+| `maxPages` | positive safe integer | `100` | Maximum number of requests; a larger known page count is rejected after the first response. |
+| `signal` | `AbortSignal` | unset | Cancellation forwarded to each request and checked between requests/after responses. |
+| `getRowId` | `(row) => string or number` | unset | Optional duplicate detection across pages. IDs must be nonempty strings or finite numbers. |
+| `onProgress` | `({loaded, total, page, pagesFetched}) => void` | unset | Called synchronously after each accepted page. `page` is zero-based; `pagesFetched` is one-based. |
+
+Returns `Promise<object[]>`. Throws/rejects on invalid limits, missing totals, source errors, cancellation, changed totals/page counts, early empty/exhausted pages, excess rows, or duplicate IDs when identity checking is enabled. A zero-total empty response returns `[]`. Accurate `rowCount` is required; positive `pageCount` metadata is optional but checked when available. This helper buffers the bounded result in memory.
+
+Use a deterministic sort ending in a unique key, or a backend snapshot/export endpoint, for changing datasets. Count/ID checks detect some inconsistencies but cannot guarantee a transactional snapshot. For larger datasets, use a server export endpoint instead of raising browser-memory limits without measurement.
+
+The helper's `signal` and `onProgress` can be forwarded directly from the built-in menu job argument or application-owned controls.
 
 ## Behavior, validation and migration
 
@@ -615,7 +805,15 @@ Import `createSpringDataSource` from the package. The [Spring example](examples/
 - Date-only `YYYY-MM-DD` values are formatted using local calendar components; timestamp/Date display follows the runtime's local timezone. Invalid or mixed-type values need application-specific handling; this is not a range/date-validation API.
 - Legacy action props and `enableSearch` remain supported. New action UI belongs in `renderRowActions` or display columns. Native renderer `row` is the original object, not `{ original: ... }`.
 - Internal `RowActions`, export menus, styled components, themes, date/path utilities and pagination controls are not public package exports. Import only the names listed in [public exports](#public-exports).
-- The package does not currently expose a complete controlled-query `state` prop, typed declarations, selection beyond email, column visibility/reordering/resizing, grouped headers, trees, persistence, print controls or virtualization. See the [parity plan](docs/mui-datatables-parity-plan.md) and [tablekit review](docs/mui-tablekit-review.md) for proposed work; those are not implemented API parameters.
+- The package now exposes controlled query state, declaration files, helper subpaths, selection ownership, export jobs, slots and localization. Column visibility/reordering/resizing, grouped headers, trees, persistence, print controls and virtualization remain future scope. See the [parity plan](docs/mui-datatables-parity-plan.md) and [tablekit review](docs/mui-tablekit-review.md) for proposed work; those are not implemented API parameters.
+
+Default table cells and rows now use standard MUI styling; no green header, forced white header text or zebra striping is applied. Parent theme component overrides remain effective, including when the selector is at `default`.
+
+See the [hardening implementation status](docs/hardening-status.md), [migration notes](CHANGELOG.md) and [production-readiness review](docs/production-readiness-review.md) for current blockers, evidence and release criteria. Passing the existing tests/build is not a production certification.
 
 The implementation separates column access (`src/core/columns.js`), row processing (`src/core/rows.js`), state (`src/hooks/useTableModel.js`), MUI composition (`src/DynamicTable.jsx`), legacy compatibility (`src/compat/legacyActions.jsx`), serialization (`src/exports.js`) and backend adaptation (`src/spring.js`). This repository is a library; the Next.js application is an optional example catalog.
 # data-table
+
+## Release qualification
+
+`npm run check` runs lint, strict public type checks, unit/interaction tests and the library build. `npm run test:package` installs a tarball into a fresh temporary consumer and verifies declarations, environment boundaries and helper imports. Build the demo and install Playwright browsers before `npm run test:browser`. `npm run benchmark` prints a synthetic row-model baseline. See [hardening status](docs/hardening-status.md) for CI coverage and remaining release gates, including dependency findings and the license decision.

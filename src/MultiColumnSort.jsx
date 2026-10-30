@@ -4,7 +4,7 @@ import SortIcon from '@mui/icons-material/Sort';
 import PropTypes from 'prop-types';
 import Tooltip from '@mui/material/Tooltip';
 
-const MultiColumnSort = ({ headers, selectedColumns, handleSortChange }) => {
+const MultiColumnSort = ({ headers, selectedColumns, handleSortChange, labels }) => {
   const [anchorEl, setAnchorEl] = useState(null);
 
   const handleClick = (event) => {
@@ -39,8 +39,8 @@ const MultiColumnSort = ({ headers, selectedColumns, handleSortChange }) => {
 
   return (
     <div>
-      <IconButton aria-label="Multi-column sort" onClick={handleClick}>
-      <Tooltip title="Multi-column sort"><SortIcon /></Tooltip>
+      <IconButton aria-label={labels.sortMenu} onClick={handleClick}>
+      <Tooltip describeChild title={labels.sortMenu}><SortIcon /></Tooltip>
       </IconButton>
       <Menu
         anchorEl={anchorEl}
@@ -58,7 +58,7 @@ const MultiColumnSort = ({ headers, selectedColumns, handleSortChange }) => {
         ))}
         <Divider />
         <MenuItem onClick={handleClearSorting}>
-          Clear Sorting
+          {labels.clearSorting}
         </MenuItem>
       </Menu>
     </div>

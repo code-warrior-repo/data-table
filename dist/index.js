@@ -1,7 +1,44 @@
-'use client';
+"use client";
+import {
+  QUERY_KEYS,
+  buildRowModel,
+  createTableState,
+  getByPath,
+  getColumnText,
+  getColumnValue,
+  getFilteredRows,
+  headersToExportColumns,
+  normalizeColumns,
+  paginateRows,
+  toTableQuery,
+  transitionTableState,
+  validateTableState
+} from "./chunk-AVPCDLU4.js";
+import {
+  createSpringDataSource,
+  fetchAllSpringRows,
+  normalizeSpringPage,
+  toSpringRequest
+} from "./chunk-NADGQ3OK.js";
+import {
+  createPdfBlob,
+  createXlsxBlob,
+  defaultExportHandlers,
+  downloadBlob,
+  exportRowsAsCsv,
+  exportRowsAsJson,
+  exportRowsAsPdf,
+  exportRowsAsTxt,
+  exportRowsAsXlsx,
+  exportWithEndpoint,
+  getExportData,
+  rowsToCsv,
+  rowsToJson,
+  rowsToTxt
+} from "./chunk-2FA4OU45.js";
 
 // src/DynamicTable.jsx
-import React7, { useEffect, useMemo as useMemo2, useRef as useRef3, useState as useState5 } from "react";
+import React7, { useEffect as useEffect2, useMemo as useMemo2, useRef as useRef3, useState as useState5 } from "react";
 import {
   Alert as Alert2,
   Box as Box2,
@@ -17,7 +54,7 @@ import {
   TableSortLabel,
   TextField as TextField2,
   Tooltip as Tooltip6,
-  Typography
+  Typography as Typography2
 } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import DensityMediumIcon from "@mui/icons-material/DensityMedium";
@@ -33,7 +70,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import PropTypes from "prop-types";
 import Tooltip from "@mui/material/Tooltip";
-var Search = ({ searchText, handleSearchTextChange }) => {
+var Search = ({ searchText, handleSearchTextChange, labels }) => {
   const [showSearch, setShowSearch] = useState(false);
   const toggleSearch = () => {
     setShowSearch(!showSearch);
@@ -44,7 +81,8 @@ var Search = ({ searchText, handleSearchTextChange }) => {
   return /* @__PURE__ */ React.createElement(Box, { display: "flex", alignItems: "center" }, showSearch && /* @__PURE__ */ React.createElement(
     TextField,
     {
-      label: "Search",
+      label: labels.search,
+      autoFocus: true,
       variant: "outlined",
       value: searchText,
       onChange: handleSearchTextChange,
@@ -52,11 +90,11 @@ var Search = ({ searchText, handleSearchTextChange }) => {
       margin: "normal",
       size: "small"
     }
-  ), /* @__PURE__ */ React.createElement(Tooltip, { title: showSearch ? "Close" : "Search" }, /* @__PURE__ */ React.createElement(
+  ), /* @__PURE__ */ React.createElement(Tooltip, { describeChild: true, title: showSearch ? labels.closeSearch : labels.openSearch }, /* @__PURE__ */ React.createElement(
     IconButton,
     {
       onClick: toggleSearch,
-      "aria-label": showSearch ? "Close search" : "Open search"
+      "aria-label": showSearch ? labels.closeSearch : labels.openSearch
     },
     showSearch ? /* @__PURE__ */ React.createElement(CloseIcon, { "aria-hidden": "true" }) : /* @__PURE__ */ React.createElement(SearchIcon, { "aria-hidden": "true" })
   )));
@@ -68,266 +106,45 @@ Search.propTypes = {
 var Search_default = Search;
 
 // src/ExportOptions.jsx
-import React2, { useRef, useState as useState2 } from "react";
-import { Alert, IconButton as IconButton2, Menu, MenuItem, Snackbar, Tooltip as Tooltip2 } from "@mui/material";
+import React2, { useEffect, useRef, useState as useState2 } from "react";
+import { Alert, Button, IconButton as IconButton2, Menu, MenuItem, Snackbar, Tooltip as Tooltip2, Typography } from "@mui/material";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 
-// src/exports.js
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1e3);
-}
-function csvCell(value) {
-  const text = value == null ? "" : String(value);
-  const safe = /^[\s]*[=+@\-]|^[\t\r\n]/.test(text) ? "'" + text : text;
-  return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
-}
-function exportColumns(columns) {
-  return columns.flatMap((column) => {
-    if (column.enableExport === false) return [];
-    if (column.columns) return exportColumns(column.columns);
-    return column.accessorKey || column.accessorFn || column.exportValue ? [column] : [];
-  });
-}
-function getExportData({ rows, columns }) {
-  const fields = exportColumns(columns);
-  return {
-    headers: fields.map((c) => String(c.exportHeader ?? (typeof c.header === "string" ? c.header : c.id ?? c.accessorKey ?? ""))),
-    keys: fields.map((c, index) => String(c.id ?? c.accessorKey ?? `column${index + 1}`)),
-    values: rows.map((row, index) => fields.map((c) => c.exportValue ? c.exportValue(row, index) : c.accessorFn ? c.accessorFn(row, index) : c.accessorKey.split(".").reduce((value, key) => value?.[key], row)))
-  };
-}
-function textValue(value) {
-  if (value == null) return "";
-  if (value instanceof Date) return value.toISOString();
-  return typeof value === "object" ? JSON.stringify(value) : String(value);
-}
-function rowsToCsv(context) {
-  const { headers, values } = getExportData(context);
-  return [headers, ...values].map((row) => row.map((value) => csvCell(textValue(value))).join(",")).join("\r\n");
-}
-function rowsToTxt(context) {
-  const { headers, values } = getExportData(context);
-  const escape = (value) => textValue(value).replaceAll("\\", "\\\\").replaceAll("	", "\\t").replaceAll("\r", "\\r").replaceAll("\n", "\\n");
-  return [headers, ...values].map((row) => row.map(escape).join("	")).join("\r\n");
-}
-function rowsToJson(context) {
-  const { keys, values } = getExportData(context);
-  const used = /* @__PURE__ */ new Set();
-  const uniqueKeys = keys.map((key) => {
-    let unique = key;
-    let suffix = 2;
-    while (used.has(unique)) unique = `${key}_${suffix++}`;
-    used.add(unique);
-    return unique;
-  });
-  return JSON.stringify(values.map((row) => Object.fromEntries(uniqueKeys.map((key, index) => [key, row[index] ?? null]))), null, 2);
-}
-function exportRowsAsCsv({ filename = "table.csv", ...context }) {
-  downloadBlob(new Blob(["\uFEFF", rowsToCsv(context)], { type: "text/csv;charset=utf-8" }), filename);
-}
-function exportRowsAsTxt({ filename = "table.txt", ...context }) {
-  downloadBlob(new Blob([rowsToTxt(context)], { type: "text/plain;charset=utf-8" }), filename);
-}
-function exportRowsAsJson({ filename = "table.json", ...context }) {
-  downloadBlob(new Blob([rowsToJson(context)], { type: "application/json;charset=utf-8" }), filename);
-}
-async function createXlsxBlob(context) {
-  const module = await import("exceljs");
-  const ExcelJS = module.default ?? module;
-  const { headers, values } = getExportData(context);
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Results");
-  sheet.addRow(headers);
-  values.forEach((row) => sheet.addRow(row.map((value) => value == null ? null : typeof value === "number" || typeof value === "boolean" || value instanceof Date ? value : textValue(value))));
-  sheet.getRow(1).font = { bold: true };
-  sheet.views = [{ state: "frozen", ySplit: 1 }];
-  sheet.columns.forEach((column) => {
-    column.width = 24;
-  });
-  return new Blob([await workbook.xlsx.writeBuffer()], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-  });
-}
-async function exportRowsAsXlsx({ filename = "table.xlsx", ...context }) {
-  downloadBlob(await createXlsxBlob(context), filename);
-}
-async function createPdfBlob(context) {
-  const [{ jsPDF }, { autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
-  const { headers, values } = getExportData(context);
-  const doc = new jsPDF({ orientation: "landscape" });
-  if (context.title) doc.text(String(context.title), 14, 15);
-  autoTable(doc, {
-    head: [headers],
-    body: values.map((row) => row.map(textValue)),
-    startY: context.title ? 22 : 14,
-    styles: { fontSize: 9, overflow: "linebreak" },
-    horizontalPageBreak: true,
-    showHead: "everyPage"
-  });
-  return doc.output("blob");
-}
-async function exportRowsAsPdf({ filename = "table.pdf", ...context }) {
-  downloadBlob(await createPdfBlob(context), filename);
-}
-var defaultExportHandlers = {
-  pdf: exportRowsAsPdf,
-  txt: exportRowsAsTxt,
-  json: exportRowsAsJson,
-  xlsx: exportRowsAsXlsx,
-  csv: exportRowsAsCsv
+// src/labels.js
+var defaultTableLabels = {
+  selection: "Selection",
+  selectAllRows: "Select all rows",
+  selectRow: (index) => `Select row ${index}`,
+  table: "Data table",
+  empty: "No matching records.",
+  actions: "Actions",
+  email: "Email",
+  sendEmail: "Send email",
+  selectAllEmails: "Select all emails",
+  selectEmailRow: (index) => `Select email row ${index}`,
+  search: "Search",
+  openSearch: "Open search",
+  closeSearch: "Close search",
+  densePadding: "Dense padding",
+  fullscreen: "Toggle fullscreen",
+  loading: "Loading rows",
+  sortMenu: "Multi-column sort",
+  clearSorting: "Clear Sorting",
+  themeSelector: "theme selector",
+  filter: (label) => `Filter ${label}`,
+  about: (label) => `About ${label}`,
+  sortSummary: (sorting) => sorting.map((sort, index) => `${sort.field}: ${sort.order}, priority ${index + 1}`).join("; "),
+  rowsPerPage: "Rows per page:",
+  firstPage: "Go to first page",
+  previousPage: "Go to previous page",
+  nextPage: "Go to next page",
+  lastPage: "Go to last page",
+  displayedRows: ({ from, to, count }) => `${from}\u2013${to} of ${count}`,
+  exportMenu: "Export menu",
+  exporting: "Preparing export",
+  cancelExport: "Cancel export",
+  exportProgress: ({ loaded, total }) => `Exporting ${loaded} of ${total} rows`
 };
-async function exportWithEndpoint({ url, filename, fetcher = fetch, signal, method = "GET", body }) {
-  const response = await fetcher(url, { method, signal, credentials: "same-origin", ...body == null ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } });
-  if (!response.ok) throw new Error(`Export failed (${response.status})`);
-  downloadBlob(await response.blob(), filename);
-}
-
-// src/utils/formatDate.js
-import { format } from "date-fns";
-function normalizeDateFormat(pattern = "MM/dd/yyyy") {
-  return pattern.replace(/YYYY/g, "yyyy").replace(/DD/g, "dd");
-}
-var formatDate = (timestamp2, dateFormat = "MM/dd/yyyy") => {
-  if (timestamp2 == null || timestamp2 === "") return "";
-  try {
-    if (timestamp2 instanceof Date) return format(timestamp2, normalizeDateFormat(dateFormat));
-    const hasTime = /[T\s]\d{2}:\d{2}/.test(timestamp2) || // e.g. "2024-04-22 13:45" or "2024-04-22T13:45"
-    /Z$/.test(timestamp2) || // ends with Z (UTC)
-    /[+-]\d{2}:\d{2}$/.test(timestamp2);
-    if (!hasTime) {
-      const m = String(timestamp2).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (m) {
-        const [, y, mo, d] = m;
-        return format(new Date(Number(y), Number(mo) - 1, Number(d)), normalizeDateFormat(dateFormat));
-      }
-    }
-    return format(new Date(timestamp2), normalizeDateFormat(dateFormat));
-  } catch {
-    try {
-      return format(timestamp2, "MM/dd/yyyy");
-    } catch {
-      return "";
-    }
-  }
-};
-var DAY_MS = 24 * 60 * 60 * 1e3;
-
-// src/util.js
-function getByPath(obj, path) {
-  if (!obj || !path) return void 0;
-  return path.split(".").reduce((acc, key) => {
-    if (acc == null) return void 0;
-    return acc[key];
-  }, obj);
-}
-function isIsoDateString(str) {
-  if (typeof str !== "string") return false;
-  return /^\d{4}-\d{2}-\d{2}(?:[T ][\d:+\-.Z]+)?$/.test(str);
-}
-function toDisplayString(value, dateFormat = "MM/dd/yyyy") {
-  if (value == null) return "";
-  if (value instanceof Date) {
-    return formatDate(value, dateFormat);
-  }
-  if (typeof value === "string" && isIsoDateString(value)) {
-    return formatDate(value, dateFormat);
-  }
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (typeof value === "string") return value;
-  return String(value);
-}
-function compareValues(a, b) {
-  if (areBothNullish(a, b)) return 0;
-  if (isNullish(a)) return -1;
-  if (isNullish(b)) return 1;
-  if (isDateLike(a) || isDateLike(b)) {
-    return compareDates(a, b);
-  }
-  const aNum = toNumberOrNull(a);
-  const bNum = toNumberOrNull(b);
-  if (aNum != null && bNum != null) {
-    return compareNumbers(aNum, bNum);
-  }
-  return compareStrings(String(a), String(b));
-}
-function isNullish(v) {
-  return v == null;
-}
-function areBothNullish(a, b) {
-  return isNullish(a) && isNullish(b);
-}
-function isDateLike(v) {
-  return v instanceof Date || isIsoDateString(v) && Number.isFinite(Date.parse(v));
-}
-function compareDates(a, b) {
-  const aTime = a instanceof Date ? a.getTime() : new Date(a).getTime();
-  const bTime = b instanceof Date ? b.getTime() : new Date(b).getTime();
-  return compareNumbers(aTime, bTime);
-}
-function toNumberOrNull(v) {
-  if (typeof v === "number") return v;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-function compareNumbers(a, b) {
-  if (a === b) return 0;
-  if (a < b) return -1;
-  return 1;
-}
-function compareStrings(a, b) {
-  return Math.sign(a.localeCompare(b, void 0, { numeric: true, sensitivity: "base" }));
-}
-
-// src/core/columns.js
-function normalizeColumns(headers = []) {
-  if (!Array.isArray(headers)) throw new TypeError("headers must be an array.");
-  const used = /* @__PURE__ */ new Set();
-  return headers.map((column) => {
-    const field = column?.field ?? column?.id;
-    if (typeof field !== "string" || !field.trim() || used.has(field)) {
-      throw new Error("Columns require unique, nonempty field or id strings.");
-    }
-    used.add(field);
-    return {
-      ...column,
-      field,
-      label: column.label ?? field,
-      ...column.type === "display" ? {
-        sortable: false,
-        searchable: false,
-        filterable: false,
-        enableExport: false
-      } : {}
-    };
-  });
-}
-function getColumnValue(row, column) {
-  if (column.type === "display") return void 0;
-  if (column.valueGetter) return column.valueGetter(row);
-  if (column.fields?.length) {
-    return column.fields.map((path) => toDisplayString(getByPath(row, path), column.dateFormat)).join(column.separator ?? "") + (column.suffix ?? "");
-  }
-  return getByPath(row, column.field);
-}
-function getColumnText(row, column) {
-  const value = getColumnValue(row, column);
-  return toDisplayString(value, column.dateFormat) + (column.fields?.length ? "" : column.suffix ?? "");
-}
-function headersToExportColumns(headers) {
-  return headers.map((header) => ({
-    id: header.field,
-    header: header.label,
-    enableExport: header.type === "display" ? false : header.enableExport,
-    exportValue: header.exportValue ?? ((row) => getColumnText(row, header))
-  }));
-}
 
 // src/exportUtils.js
 function timestamp(date = /* @__PURE__ */ new Date()) {
@@ -350,44 +167,86 @@ function ExportOptions({
   exportOptions = {},
   exportHandlers = {},
   state,
-  disabled = false
+  disabled = false,
+  onExportStart,
+  onExportComplete,
+  onExportError,
+  onExportCancel,
+  labels = defaultTableLabels
 }) {
   const [anchor, setAnchor] = useState2(null);
   const [busy, setBusy] = useState2(false);
-  const lock = useRef(false);
+  const active = useRef(null);
   const [error, setError] = useState2("");
-  async function run(format2) {
-    if (lock.current) return;
-    lock.current = true;
+  const [progress, setProgress] = useState2(null);
+  useEffect(() => () => {
+    active.current?.controller.abort();
+    active.current = null;
+  }, []);
+  function cancel() {
+    const job = active.current;
+    if (!job) return;
+    active.current = null;
+    job.controller.abort();
+    setBusy(false);
+    setProgress(null);
+    onExportCancel?.(job.info);
+  }
+  async function run(format) {
+    if (active.current) return;
+    const snapshot = state ? { ...state, sorting: state.sorting.map((sort) => ({ ...sort })), columnFilters: { ...state.columnFilters } } : void 0;
+    const filename = `${pageTitle.replace(/[^a-z0-9_-]+/gi, "_") || "table"}_${timestamp()}.${format}`;
+    const controller = new AbortController();
+    const info = { format, filename, state: snapshot };
+    const job = { controller, info };
+    active.current = job;
+    const signal = controller.signal;
+    const onProgress = (value) => {
+      if (active.current === job && !signal.aborted) setProgress(value);
+    };
     setBusy(true);
+    setError("");
     setAnchor(null);
     try {
-      const rows = fetchAllRows ? await fetchAllRows() : data;
+      onExportStart?.(info);
+      const configured = exportHandlers[format] ?? defaultExportHandlers[format];
+      const handler = typeof configured === "function" ? configured : configured.handler;
+      const rows = configured.mode === "endpoint" ? [] : fetchAllRows ? await fetchAllRows({ signal, onProgress }) : data;
+      if (signal.aborted || active.current !== job) return;
       if (!Array.isArray(rows)) throw new Error("Export must return an array of rows.");
-      const filename = `${pageTitle.replace(/[^a-z0-9_-]+/gi, "_") || "table"}_${timestamp()}.${format2}`;
-      await (exportHandlers[format2] ?? defaultExportHandlers[format2])({
+      await handler({
         rows,
         columns: headersToExportColumns(headers),
         title: pageTitle,
         filename,
-        state
+        state: snapshot,
+        signal,
+        onProgress
       });
+      if (!signal.aborted && active.current === job) onExportComplete?.({ ...info, rowCount: configured.mode === "endpoint" ? void 0 : rows.length });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Export failed.");
+      if (!signal.aborted && active.current === job) {
+        const failure = cause instanceof Error ? cause : new Error(String(cause));
+        setError(failure.message);
+        onExportError?.(failure, info);
+      }
     } finally {
-      lock.current = false;
-      setBusy(false);
+      if (active.current === job) {
+        active.current = null;
+        setBusy(false);
+        setProgress(null);
+      }
     }
   }
-  return /* @__PURE__ */ React2.createElement(React2.Fragment, null, /* @__PURE__ */ React2.createElement(Tooltip2, { title: "Export" }, /* @__PURE__ */ React2.createElement("span", null, /* @__PURE__ */ React2.createElement(
+  return /* @__PURE__ */ React2.createElement(React2.Fragment, null, /* @__PURE__ */ React2.createElement(Tooltip2, { describeChild: true, title: labels.exportMenu }, /* @__PURE__ */ React2.createElement("span", null, /* @__PURE__ */ React2.createElement(
     IconButton2,
     {
-      "aria-label": "Export menu",
+      "aria-label": labels.exportMenu,
       disabled: busy || disabled,
       onClick: (event) => setAnchor(event.currentTarget)
     },
     /* @__PURE__ */ React2.createElement(FileDownloadIcon, null)
-  ))), /* @__PURE__ */ React2.createElement(Menu, { anchorEl: anchor, open: Boolean(anchor), onClose: () => setAnchor(null) }, ["csv", "txt", "xlsx", "pdf", "json"].filter((format2) => exportOptions[format2] ?? format2 !== "json").map((format2) => /* @__PURE__ */ React2.createElement(MenuItem, { key: format2, onClick: () => run(format2) }, format2.toUpperCase()))), /* @__PURE__ */ React2.createElement(Snackbar, { open: Boolean(error), autoHideDuration: 6e3, onClose: () => setError("") }, /* @__PURE__ */ React2.createElement(Alert, { severity: "error", onClose: () => setError("") }, error)));
+  ))), busy && /* @__PURE__ */ React2.createElement(React2.Fragment, null, /* @__PURE__ */ React2.createElement(Typography, { role: "status" }, progress ? labels.exportProgress(progress) : labels.exporting), /* @__PURE__ */ React2.createElement(Button, { onClick: cancel }, labels.cancelExport)), /* @__PURE__ */ React2.createElement(Menu, { anchorEl: anchor, open: Boolean(anchor), onClose: () => setAnchor(null) }, ["csv", "txt", "xlsx", "pdf", "json"].filter((format) => exportOptions[format] ?? format !== "json").map((format) => /* @__PURE__ */ React2.createElement(MenuItem, { key: format, onClick: () => run(format) }, format.toUpperCase()))), /* @__PURE__ */ React2.createElement(Snackbar, { open: Boolean(error), autoHideDuration: 6e3, onClose: () => setError("") }, /* @__PURE__ */ React2.createElement(Alert, { severity: "error", onClose: () => setError("") }, error)));
 }
 
 // src/MultiColumnSort.jsx
@@ -396,7 +255,7 @@ import { IconButton as IconButton3, Menu as Menu2, MenuItem as MenuItem2, Checkb
 import SortIcon from "@mui/icons-material/Sort";
 import PropTypes2 from "prop-types";
 import Tooltip3 from "@mui/material/Tooltip";
-var MultiColumnSort = ({ headers, selectedColumns, handleSortChange }) => {
+var MultiColumnSort = ({ headers, selectedColumns, handleSortChange, labels }) => {
   const [anchorEl, setAnchorEl] = useState3(null);
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -422,7 +281,7 @@ var MultiColumnSort = ({ headers, selectedColumns, handleSortChange }) => {
     handleSortChange([]);
     handleClose();
   };
-  return /* @__PURE__ */ React3.createElement("div", null, /* @__PURE__ */ React3.createElement(IconButton3, { "aria-label": "Multi-column sort", onClick: handleClick }, /* @__PURE__ */ React3.createElement(Tooltip3, { title: "Multi-column sort" }, /* @__PURE__ */ React3.createElement(SortIcon, null))), /* @__PURE__ */ React3.createElement(
+  return /* @__PURE__ */ React3.createElement("div", null, /* @__PURE__ */ React3.createElement(IconButton3, { "aria-label": labels.sortMenu, onClick: handleClick }, /* @__PURE__ */ React3.createElement(Tooltip3, { describeChild: true, title: labels.sortMenu }, /* @__PURE__ */ React3.createElement(SortIcon, null))), /* @__PURE__ */ React3.createElement(
     Menu2,
     {
       anchorEl,
@@ -437,7 +296,7 @@ var MultiColumnSort = ({ headers, selectedColumns, handleSortChange }) => {
       }
     ), /* @__PURE__ */ React3.createElement(ListItemText, { primary: header.label }))),
     /* @__PURE__ */ React3.createElement(Divider, null),
-    /* @__PURE__ */ React3.createElement(MenuItem2, { onClick: handleClearSorting }, "Clear Sorting")
+    /* @__PURE__ */ React3.createElement(MenuItem2, { onClick: handleClearSorting }, labels.clearSorting)
   ));
 };
 MultiColumnSort.propTypes = {
@@ -462,16 +321,7 @@ import PropTypes3 from "prop-types";
 // src/themes.js
 import { createTheme } from "@mui/material/styles";
 var themes = {
-  default: createTheme({
-    palette: {
-      primary: {
-        main: "#008000"
-      },
-      secondary: {
-        main: "#ff4081"
-      }
-    }
-  }),
+  default: createTheme(),
   grey: createTheme({
     palette: {
       primary: {
@@ -509,7 +359,7 @@ var themes = {
 
 // src/ThemeSelector.jsx
 import Tooltip4 from "@mui/material/Tooltip";
-var ThemeSelector = ({ handleThemeChange }) => {
+var ThemeSelector = ({ handleThemeChange, labels }) => {
   const [anchorEl, setAnchorEl] = React4.useState(null);
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -520,7 +370,7 @@ var ThemeSelector = ({ handleThemeChange }) => {
       handleThemeChange(theme);
     }
   };
-  return /* @__PURE__ */ React4.createElement("div", null, /* @__PURE__ */ React4.createElement(IconButton4, { "aria-label": "theme selector", onClick: handleClick }, /* @__PURE__ */ React4.createElement(Tooltip4, { title: "Select Theme" }, /* @__PURE__ */ React4.createElement(PaletteIcon, null))), /* @__PURE__ */ React4.createElement(
+  return /* @__PURE__ */ React4.createElement("div", null, /* @__PURE__ */ React4.createElement(IconButton4, { "aria-label": labels.themeSelector, onClick: handleClick }, /* @__PURE__ */ React4.createElement(Tooltip4, { describeChild: true, title: labels.themeSelector }, /* @__PURE__ */ React4.createElement(PaletteIcon, null))), /* @__PURE__ */ React4.createElement(
     Menu3,
     {
       anchorEl,
@@ -537,43 +387,13 @@ var ThemeSelector_default = ThemeSelector;
 
 // src/StyledComponents.js
 import { styled } from "@mui/material/styles";
-import TableCell, { tableCellClasses } from "@mui/material/TableCell";
-import TableRow from "@mui/material/TableRow";
-var StyledTableCell = styled(TableCell)(({ theme }) => ({
-  [`&.${tableCellClasses.head}`]: {
-    backgroundColor: theme.palette.primary.main,
-    color: theme.palette.common.white,
-    fontSize: "inherit"
-  },
-  [`&.${tableCellClasses.body}`]: {
-    fontSize: 14
-  }
-}));
-var StyledTableRow = styled(TableRow)(({ theme }) => ({
-  "&:nth-of-type(odd)": {
-    backgroundColor: theme.palette.action.hover
-  },
-  // hide last border
-  "&:last-child td, &:last-child th": {
-    border: 0
-  }
-}));
-var StyledActionTableCell = styled(TableCell)(({ theme }) => ({
+import TableCell from "@mui/material/TableCell";
+import { default as default2 } from "@mui/material/TableCell";
+import { default as default3 } from "@mui/material/TableRow";
+var StyledActionTableCell = styled(TableCell)({
   whiteSpace: "nowrap",
-  textAlign: "right",
-  width: "1%",
-  paddingRight: theme.spacing(2),
-  "& .MuiButtonBase-root": {
-    cursor: "pointer",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: theme.spacing(0.5)
-  },
-  // If rendering text Buttons when icons are off
-  "& .MuiButton-root:hover": {
-    textDecoration: "underline"
-  }
-}));
+  width: "1%"
+});
 
 // src/CustomTablePagination.jsx
 import React5 from "react";
@@ -584,7 +404,8 @@ function CustomTablePagination({
   rowsPerPage,
   onPageChange,
   onRowsPerPageChange,
-  rowsPerPageOptions = [5, 10, 20, 30, { value: -1, label: "All" }]
+  rowsPerPageOptions = [5, 10, 20, 30, { value: -1, label: "All" }],
+  labels
 }) {
   const options = rowsPerPageOptions.some((option) => (option.value ?? option) === rowsPerPage) ? rowsPerPageOptions : [rowsPerPage, ...rowsPerPageOptions];
   return /* @__PURE__ */ React5.createElement(
@@ -597,67 +418,50 @@ function CustomTablePagination({
       rowsPerPageOptions: options,
       onPageChange: (_, next) => onPageChange(next),
       onRowsPerPageChange,
+      labelRowsPerPage: labels.rowsPerPage,
+      labelDisplayedRows: labels.displayedRows,
+      getItemAriaLabel: (type) => labels[`${type}Page`],
       showFirstButton: true,
       showLastButton: true
     }
   );
 }
 
-// src/hooks/useTableModel.js
-import { useMemo, useRef as useRef2, useState as useState4 } from "react";
+// src/core/layout.js
+function insertSelectionCell(cells, cell, position = "first") {
+  const index = position === "first" ? 0 : position === "last" ? cells.length : position;
+  if (!Number.isInteger(index) || index < 0 || index > cells.length) {
+    throw new RangeError(`selectionColumnPosition must be first, last, or an index from 0 to ${cells.length}.`);
+  }
+  return [...cells.slice(0, index), cell, ...cells.slice(index)];
+}
+function arrangeToolbarControls(controls, alignment = "left", positions = {}) {
+  if (!["left", "right"].includes(alignment)) throw new Error("toolbarAlignment must be left or right.");
+  for (const [key, side] of Object.entries(positions)) {
+    if (!Object.hasOwn(controls, key)) throw new Error(`Unknown toolbar control: ${key}`);
+    if (!["left", "right"].includes(side)) throw new Error(`Toolbar position for ${key} must be left or right.`);
+  }
+  return Object.entries(controls).map(([id, node]) => ({ id, node, side: positions[id] ?? alignment })).filter(({ node }) => node !== false && node !== null && node !== void 0).sort((a, b) => Number(a.side === "right") - Number(b.side === "right"));
+}
 
-// src/core/rows.js
-function buildRowModel({
-  data = [],
-  headers = [],
-  searchText = "",
-  columnFilters = {},
-  sorting = [],
-  page = 0,
-  rowsPerPage = 5,
-  serverSide = false,
-  totalCount
-}) {
-  if (!Array.isArray(data) || !Array.isArray(headers)) throw new TypeError("data and headers must be arrays.");
-  if (!Number.isInteger(page) || page < 0) throw new RangeError("page must be a nonnegative integer.");
-  if (rowsPerPage !== -1 && (!Number.isInteger(rowsPerPage) || rowsPerPage < 1)) {
-    throw new RangeError("rowsPerPage must be a positive integer or -1 (All).");
-  }
-  if (totalCount !== void 0 && (!Number.isInteger(totalCount) || totalCount < 0)) {
-    throw new RangeError("totalCount must be a nonnegative integer.");
-  }
-  const dataColumns = headers.filter((column) => column.type !== "display");
-  const sortColumns = new Map(dataColumns.map((column) => [column.field, column]));
-  const comparators = sorting.flatMap((sort) => {
-    const column = sortColumns.get(sort.field);
-    return !column || column.sortable === false ? [] : [{ column, sort }];
+// src/core/identity.js
+function rowIdentities(data, { getRowId, uniqueField, requireIds = false }) {
+  const seen = /* @__PURE__ */ new Set();
+  const identities = /* @__PURE__ */ new Map();
+  data.forEach((row, index) => {
+    if (identities.has(row)) throw new Error("Duplicate row ID or repeated row reference.");
+    const supplied = getRowId ? getRowId(row) : getByPath(row, uniqueField || "id");
+    const id = supplied ?? (requireIds || getRowId ? void 0 : index);
+    if (!["string", "number"].includes(typeof id) || typeof id === "string" && !id.trim() || typeof id === "number" && !Number.isFinite(id)) throw new Error("Rows with interactive controls require a stable string or number ID.");
+    if (seen.has(id)) throw new Error(`Duplicate row ID: ${id}`);
+    seen.add(id);
+    identities.set(row, id);
   });
-  const search = String(searchText).trim().toLocaleLowerCase();
-  const filtered = serverSide ? data : data.filter((row) => (!search || dataColumns.some((column) => column.searchable !== false && getColumnText(row, column).toLocaleLowerCase().includes(search))) && dataColumns.every((column) => {
-    const filter = Object.hasOwn(columnFilters, column.field) ? columnFilters[column.field] : void 0;
-    if (filter == null || filter === "" || column.filterable === false) return true;
-    return column.filterFn ? column.filterFn(getColumnValue(row, column), filter, row) : getColumnText(row, column).toLocaleLowerCase().includes(String(filter).toLocaleLowerCase());
-  }));
-  const sorted = serverSide ? filtered : [...filtered].sort((a, b) => {
-    for (const { column, sort } of comparators) {
-      const compare = column.sortComparator ?? compareValues;
-      const result = compare(getColumnValue(a, column), getColumnValue(b, column));
-      if (result) return sort.order === "desc" ? -result : result;
-    }
-    return 0;
-  });
-  const count = serverSide ? totalCount ?? data.length : filtered.length;
-  const lastPage = rowsPerPage === -1 ? 0 : Math.max(0, Math.ceil(count / rowsPerPage) - 1);
-  const safePage = serverSide ? page : Math.min(page, lastPage);
-  return {
-    filteredRows: sorted,
-    count,
-    page: safePage,
-    rows: serverSide || rowsPerPage === -1 ? sorted : sorted.slice(safePage * rowsPerPage, (safePage + 1) * rowsPerPage)
-  };
+  return identities;
 }
 
 // src/hooks/useTableModel.js
+import { useCallback, useLayoutEffect, useMemo, useRef as useRef2, useState as useState4 } from "react";
 var EMPTY = [];
 function useTableModel({
   data = EMPTY,
@@ -668,48 +472,76 @@ function useTableModel({
   order = "asc",
   serverSidePagination = false,
   totalCount,
-  onPageChangeRequest
+  onPageChangeRequest,
+  state: controlledState,
+  initialState,
+  onStateChange,
+  onQueryChange
 }) {
-  const [state, setState] = useState4(() => ({
+  const ownedKeys = QUERY_KEYS.filter((key) => Object.hasOwn(controlledState ?? {}, key)).join(",");
+  const ownership = useRef2(ownedKeys);
+  if (ownership.current !== ownedKeys) throw new Error("Controlled state keys must remain fixed; remount to change ownership.");
+  const [internal, setInternal] = useState4(() => createTableState({
     page: currentPage ?? 0,
     rowsPerPage: initialRowsPerPage,
-    searchText: "",
-    columnFilters: {},
-    sorting: orderBy ? [{ field: orderBy, order }] : []
+    sorting: orderBy ? [{ field: orderBy, order }] : [],
+    ...initialState
   }));
-  const requestedPage = currentPage ?? state.page;
+  const effective = validateTableState({
+    ...internal,
+    ...currentPage !== void 0 ? { page: currentPage } : {},
+    ...controlledState
+  });
+  const { page, rowsPerPage, searchText, columnFilters, sorting } = effective;
+  const filteredRows = useMemo(() => getFilteredRows({
+    data,
+    headers,
+    searchText,
+    columnFilters,
+    sorting,
+    serverSide: serverSidePagination
+  }), [data, headers, searchText, columnFilters, sorting, serverSidePagination]);
   const model = useMemo(
-    () => buildRowModel({
-      data,
-      headers,
-      ...state,
-      page: requestedPage,
-      serverSide: serverSidePagination,
-      totalCount
-    }),
-    [data, headers, state, requestedPage, serverSidePagination, totalCount]
+    () => paginateRows({ filteredRows, page, rowsPerPage, serverSide: serverSidePagination, totalCount }),
+    [filteredRows, page, rowsPerPage, serverSidePagination, totalCount]
   );
-  const latest = useRef2(state);
-  latest.current = { ...state, page: model.page };
-  function update(change) {
-    const patch = typeof change === "function" ? change(latest.current) : change;
-    const resetPage = ["searchText", "columnFilters", "sorting", "rowsPerPage"].some((key) => Object.hasOwn(patch, key));
-    const next = { ...latest.current, ...resetPage ? { page: 0 } : {}, ...patch };
-    latest.current = next;
-    setState(next);
-    if (serverSidePagination) onPageChangeRequest?.({
-      ...next,
-      sortBy: next.sorting[0]?.field ?? "",
-      sortDir: next.sorting[0]?.order ?? "asc",
-      selectedColumns: next.sorting
+  const state = { ...effective, page: model.page };
+  const settings = {
+    state,
+    controlledState,
+    currentPage,
+    serverSidePagination,
+    onStateChange,
+    onQueryChange,
+    onPageChangeRequest
+  };
+  const latest = useRef2(settings);
+  useLayoutEffect(() => {
+    latest.current = settings;
+  });
+  const update = useCallback((change) => {
+    const current = latest.current;
+    const { next, event } = transitionTableState(current.state, change);
+    if (!event.changedKeys.length) return;
+    latest.current = { ...current, state: next };
+    setInternal((previous) => {
+      const uncontrolled = { ...previous };
+      for (const key of QUERY_KEYS) {
+        const owned = Object.hasOwn(current.controlledState ?? {}, key) || key === "page" && current.currentPage !== void 0;
+        if (!owned) uncontrolled[key] = next[key];
+      }
+      return uncontrolled;
     });
-  }
-  return { ...state, ...model, update };
+    current.onStateChange?.(next, event);
+    current.onQueryChange?.(next, event);
+    if (current.serverSidePagination) current.onPageChangeRequest?.(toTableQuery(next));
+  }, []);
+  return { ...state, ...model, state, update };
 }
 
 // src/compat/legacyActions.jsx
 import React6 from "react";
-import { Button, IconButton as IconButton5, Stack, Tooltip as Tooltip5 } from "@mui/material";
+import { Button as Button2, IconButton as IconButton5, Stack, Tooltip as Tooltip5 } from "@mui/material";
 import View from "@mui/icons-material/Visibility";
 import Edit from "@mui/icons-material/Edit";
 import Delete from "@mui/icons-material/Delete";
@@ -729,7 +561,7 @@ function renderLegacyRowActions({ row, actions, icons, visibility = {} }) {
     const Icon = action.icon;
     const disabled = !action.onClick || (typeof action.disabled === "function" ? action.disabled(row) : action.disabled);
     return icons && Icon ? /* @__PURE__ */ React6.createElement(Tooltip5, { title: action.label, key: action.id }, /* @__PURE__ */ React6.createElement("span", null, /* @__PURE__ */ React6.createElement(IconButton5, { "aria-label": action.label, disabled, size: "small", onClick: () => action.onClick(row) }, /* @__PURE__ */ React6.createElement(Icon, null)))) : /* @__PURE__ */ React6.createElement(
-      Button,
+      Button2,
       {
         key: action.id,
         size: "small",
@@ -743,11 +575,18 @@ function renderLegacyRowActions({ row, actions, icons, visibility = {} }) {
 
 // src/DynamicTable.jsx
 function DynamicTable(props) {
+  const labels = { ...defaultTableLabels, ...props.labels };
+  const slots = props.slots ?? {};
+  const slotProps = props.slotProps ?? {};
+  const Root = slots.root ?? Paper, Toolbar = slots.toolbar ?? Stack2, Head = slots.header ?? TableHead;
+  const Body = slots.body ?? TableBody, Row = slots.row ?? default3, Cell = slots.cell ?? default2;
+  const ActionCell = slots.actionCell ?? StyledActionTableCell, TableComponent = slots.table ?? Table;
+  const Footer = slots.footer ?? CustomTablePagination;
   const {
     enableColumnFilters = false,
     loading = false,
     error,
-    emptyDataMessage = "No matching records.",
+    emptyDataMessage = labels.empty,
     pageTitle = "",
     enableEmail = false,
     uniqueField = "",
@@ -756,23 +595,56 @@ function DynamicTable(props) {
     serverSidePagination = false,
     fetchAllForExport
   } = props;
+  const selectionEnabled = Boolean(props.enableRowSelection || enableEmail);
+  const selectionLabel = props.selectionColumnLabel ?? (props.enableRowSelection ? labels.selection : labels.email);
+  const selectAllLabel = props.enableRowSelection ? labels.selectAllRows : labels.selectAllEmails;
   const headers = useMemo2(() => normalizeColumns(props.headers), [props.headers]);
   const model = useTableModel({ ...props, headers });
   const [theme, setTheme] = useState5("default");
   const [dense, setDense] = useState5(false);
   const [fullscreen, setFullscreen] = useState5(false);
   const [fullscreenError, setFullscreenError] = useState5("");
-  const [selection, setSelection] = useState5({ data: props.data, ids: /* @__PURE__ */ new Set() });
-  const selected = selection.data === props.data ? selection.ids : /* @__PURE__ */ new Set();
+  const [selection, setSelection] = useState5({ data: props.data, datasetKey: props.datasetKey, ids: new Set(props.initialSelectedRowIds ?? []) });
+  const selectionValid = Object.is(selection.datasetKey, props.datasetKey) && (props.selectionReset === "dataset" || selection.data === props.data);
+  const selected = props.selectedRowIds !== void 0 ? new Set(props.selectedRowIds) : selectionValid ? selection.ids : /* @__PURE__ */ new Set();
+  useEffect2(() => {
+    setSelection((previous) => {
+      const valid = Object.is(previous.datasetKey, props.datasetKey) && (props.selectionReset === "dataset" || previous.data === props.data);
+      return valid ? previous : { data: props.data, datasetKey: props.datasetKey, ids: /* @__PURE__ */ new Set() };
+    });
+  }, [props.data, props.datasetKey, props.selectionReset]);
   const ref = useRef3(null);
   const actions = buildActions(props);
   const hasActions = props.enableRowActions !== false && (typeof props.renderRowActions === "function" || actions.length > 0);
-  const identify = (row) => getRowId ? getRowId(row) : getByPath(row, uniqueField || "id") ?? row;
+  const requireIds = Boolean(selectionEnabled || props.renderBulkActions || hasActions || headers.some((header) => header.renderCell));
+  const identities = useMemo2(
+    () => rowIdentities(props.data ?? [], { getRowId, uniqueField, requireIds }),
+    [props.data, getRowId, uniqueField, requireIds]
+  );
+  const identify = (row) => identities.get(row);
+  function updateSelection(ids) {
+    if (props.selectedRowIds === void 0) setSelection({ data: props.data, datasetKey: props.datasetKey, ids });
+    props.onSelectionChange?.([...ids]);
+  }
   const selectedRows = model.filteredRows.filter((row) => selected.has(identify(row)));
-  const allSelected = model.filteredRows.length > 0 && selectedRows.length === model.filteredRows.length;
-  const columnCount = headers.length + Number(hasActions) + Number(enableEmail);
+  const selectedRowIds = [...selected];
+  const selectedLoadedRows = (props.data ?? []).filter((row) => selected.has(identify(row)));
+  const loadedIds = new Set(identities.values());
+  const bulkContext = {
+    selectedRowIds,
+    selectedRows: selectedLoadedRows,
+    selectedCount: selected.size,
+    unloadedSelectedRowIds: selectedRowIds.filter((id) => !loadedIds.has(id)),
+    clearSelection: () => updateSelection(/* @__PURE__ */ new Set()),
+    disabled: loading || Boolean(error),
+    state: model.state
+  };
+  const selectionRows = props.selectionScope === "page" ? model.rows : model.filteredRows;
+  const selectedInScope = selectionRows.filter((row) => selected.has(identify(row))).length;
+  const allSelected = selectionRows.length > 0 && selectedInScope === selectionRows.length;
+  const columnCount = headers.length + Number(hasActions) + Number(selectionEnabled);
   const sort = model.sorting[0];
-  useEffect(() => {
+  useEffect2(() => {
     const change = () => setFullscreen(document.fullscreenElement === ref.current);
     document.addEventListener("fullscreenchange", change);
     return () => document.removeEventListener("fullscreenchange", change);
@@ -790,10 +662,10 @@ function DynamicTable(props) {
     const ids = new Set(selected);
     if (checked) ids.add(identify(row));
     else ids.delete(identify(row));
-    setSelection({ data: props.data, ids });
+    updateSelection(ids);
   }
   const needsAllRows = serverSidePagination && model.count > model.filteredRows.length;
-  const exportFetch = needsAllRows ? async () => {
+  const exportFetch = needsAllRows ? async (context) => {
     if (!fetchAllForExport) throw new Error("Provide fetchAllForExport to export the full server result.");
     return fetchAllForExport({
       orderBy: sort?.field ?? "",
@@ -801,59 +673,29 @@ function DynamicTable(props) {
       selectedColumns: model.sorting,
       searchText: model.searchText,
       columnFilters: model.columnFilters
-    });
+    }, context);
   } : void 0;
-  const content = /* @__PURE__ */ React7.createElement(Paper, { ref, sx: { width: "100%", overflow: "auto", p: fullscreen ? 2 : 0 } }, /* @__PURE__ */ React7.createElement(Stack2, { direction: "row", spacing: 1, sx: { p: 1, alignItems: "center", flexWrap: "wrap" } }, pageTitle && /* @__PURE__ */ React7.createElement(Typography, { component: "h2", variant: "h6", sx: { flexGrow: 1 } }, pageTitle), (props.searchByText || props.enableSearch) && /* @__PURE__ */ React7.createElement(
-    Search_default,
+  function toggleAllRows(checked) {
+    const ids = new Set(selected);
+    selectionRows.forEach((row) => checked ? ids.add(identify(row)) : ids.delete(identify(row)));
+    updateSelection(ids);
+  }
+  const selectionHeader = /* @__PURE__ */ React7.createElement(Cell, { key: "selection-column" }, /* @__PURE__ */ React7.createElement(
+    Checkbox2,
     {
-      searchText: model.searchText,
-      handleSearchTextChange: (event) => model.update({ searchText: event.target.value, page: 0 })
+      slotProps: { input: { "aria-label": selectAllLabel } },
+      disabled: loading || Boolean(error),
+      checked: allSelected,
+      indeterminate: selectedInScope > 0 && !allSelected,
+      onChange: (event) => toggleAllRows(event.target.checked)
     }
-  ), props.enableDensePadding && /* @__PURE__ */ React7.createElement(IconButton6, { "aria-label": "Dense padding", onClick: () => setDense(!dense) }, /* @__PURE__ */ React7.createElement(DensityMediumIcon, null)), props.enableMultiColumnSort && /* @__PURE__ */ React7.createElement(
-    MultiColumnSort_default,
-    {
-      headers: headers.filter((h) => h.sortable !== false),
-      selectedColumns: model.sorting,
-      handleSortChange: (sorting) => model.update({ sorting, page: 0 })
-    }
-  ), props.enableExport && /* @__PURE__ */ React7.createElement(
-    ExportOptions,
-    {
-      headers,
-      data: model.filteredRows,
-      pageTitle,
-      fetchAllRows: exportFetch,
-      exportOptions: props.exportOptions,
-      exportHandlers: props.exportHandlers,
-      state: {
-        page: model.page,
-        rowsPerPage: model.rowsPerPage,
-        sorting: model.sorting,
-        searchText: model.searchText,
-        columnFilters: model.columnFilters
-      },
-      disabled: loading || Boolean(error)
-    }
-  ), props.enableThemes && /* @__PURE__ */ React7.createElement(ThemeSelector_default, { currentTheme: theme, handleThemeChange: setTheme }), props.enableFullScreenOption && /* @__PURE__ */ React7.createElement(IconButton6, { "aria-label": "Toggle fullscreen", onClick: toggleFullscreen }, fullscreen ? /* @__PURE__ */ React7.createElement(FullscreenExitIcon, null) : /* @__PURE__ */ React7.createElement(FullscreenIcon, null)), enableEmail && /* @__PURE__ */ React7.createElement(
-    IconButton6,
-    {
-      "aria-label": "Send email",
-      disabled: !onEmail || loading || Boolean(error),
-      onClick: () => onEmail(selectedRows.length ? selectedRows : model.filteredRows)
-    },
-    /* @__PURE__ */ React7.createElement(EmailIcon, null)
-  ), props.renderToolbar?.({ ...model, selectedRows })), fullscreenError && /* @__PURE__ */ React7.createElement(Alert2, { severity: "warning", onClose: () => setFullscreenError("") }, fullscreenError), error && /* @__PURE__ */ React7.createElement(Alert2, { severity: "error" }, error instanceof Error ? error.message : String(error)), loading && /* @__PURE__ */ React7.createElement(LinearProgress, { "aria-label": "Loading rows" }), /* @__PURE__ */ React7.createElement(TableContainer, { sx: { maxHeight: props.maxHeight } }, /* @__PURE__ */ React7.createElement(
-    Table,
-    {
-      stickyHeader: props.stickyHeader,
-      size: dense ? "small" : "medium",
-      "aria-label": props["aria-label"] ?? (pageTitle || "Data table"),
-      "aria-busy": loading
-    },
-    /* @__PURE__ */ React7.createElement(TableHead, null, /* @__PURE__ */ React7.createElement(StyledTableRow, null, headers.map((header) => /* @__PURE__ */ React7.createElement(
-      StyledTableCell,
+  ), selectionLabel);
+  const headerCells = [
+    ...headers.map((header) => /* @__PURE__ */ React7.createElement(
+      Cell,
       {
-        key: header.field,
+        ...slotProps.cell,
+        key: `column-${header.field}`,
         style: { width: header.width },
         align: header.align,
         sortDirection: sort?.field === header.field ? sort.order : false
@@ -870,12 +712,12 @@ function DynamicTable(props) {
         },
         header.label
       ),
-      props.tooltipFields?.[header.field] && /* @__PURE__ */ React7.createElement(Tooltip6, { title: props.tooltipFields[header.field].join(", ") }, /* @__PURE__ */ React7.createElement(IconButton6, { size: "small", "aria-label": `About ${header.label}` }, /* @__PURE__ */ React7.createElement(InfoIcon, { fontSize: "small" }))),
+      props.tooltipFields?.[header.field] && /* @__PURE__ */ React7.createElement(Tooltip6, { title: props.tooltipFields[header.field].join(", ") }, /* @__PURE__ */ React7.createElement(IconButton6, { size: "small", "aria-label": labels.about(header.label) }, /* @__PURE__ */ React7.createElement(InfoIcon, { fontSize: "small" }))),
       enableColumnFilters && header.filterable !== false && /* @__PURE__ */ React7.createElement(
         TextField2,
         {
           size: "small",
-          label: `Filter ${header.label}`,
+          label: labels.filter(header.label),
           value: model.columnFilters[header.field] ?? "",
           onChange: (event) => model.update({
             page: 0,
@@ -883,29 +725,107 @@ function DynamicTable(props) {
           })
         }
       )
-    )), hasActions && /* @__PURE__ */ React7.createElement(StyledTableCell, null, props.actionsColumnLabel ?? "Actions"), enableEmail && /* @__PURE__ */ React7.createElement(StyledTableCell, null, /* @__PURE__ */ React7.createElement(
-      Checkbox2,
-      {
-        "aria-label": "Select all emails",
-        checked: allSelected,
-        indeterminate: selectedRows.length > 0 && !allSelected,
-        onChange: (event) => setSelection({ data: props.data, ids: new Set(event.target.checked ? model.filteredRows.map(identify) : []) })
-      }
-    ), "Email"))),
-    /* @__PURE__ */ React7.createElement(TableBody, null, !error && model.rows.map((row, index) => {
-      const rowId = getRowId ? getRowId(row) : getByPath(row, uniqueField || "id") ?? index;
-      return /* @__PURE__ */ React7.createElement(StyledTableRow, { key: rowId, hover: true }, headers.map((header) => /* @__PURE__ */ React7.createElement(StyledTableCell, { key: header.field, align: header.align }, header.renderCell ? header.renderCell({ row, value: getColumnValue(row, header), rowIndex: index, rowId }) : getColumnText(row, header))), hasActions && /* @__PURE__ */ React7.createElement(StyledActionTableCell, null, props.renderRowActions ? props.renderRowActions({ row, rowIndex: index, rowId }) : renderLegacyRowActions({ row, actions, icons: props.showActionIcons, visibility: props.actionVisibilityRules })), enableEmail && /* @__PURE__ */ React7.createElement(StyledTableCell, null, /* @__PURE__ */ React7.createElement(
-        Checkbox2,
-        {
-          "aria-label": `Select email row ${index + 1}`,
-          checked: selected.has(identify(row)),
-          onChange: (event) => toggleRow(row, event.target.checked)
-        }
-      )));
-    }), !loading && !error && model.rows.length === 0 && /* @__PURE__ */ React7.createElement(StyledTableRow, null, /* @__PURE__ */ React7.createElement(StyledTableCell, { colSpan: Math.max(1, columnCount), align: "center" }, emptyDataMessage)))
-  )), /* @__PURE__ */ React7.createElement(
-    CustomTablePagination,
+    )),
+    ...hasActions ? [/* @__PURE__ */ React7.createElement(Cell, { key: "row-actions" }, props.actionsColumnLabel ?? labels.actions)] : []
+  ];
+  const renderSelectionCell = (row, index) => /* @__PURE__ */ React7.createElement(Cell, { key: "selection-column" }, /* @__PURE__ */ React7.createElement(
+    Checkbox2,
     {
+      slotProps: { input: { "aria-label": props.enableRowSelection ? labels.selectRow(index + 1) : labels.selectEmailRow(index + 1) } },
+      disabled: loading || Boolean(error),
+      checked: selected.has(identify(row)),
+      onChange: (event) => toggleRow(row, event.target.checked)
+    }
+  ));
+  const controls = {
+    search: (props.searchByText || props.enableSearch) && /* @__PURE__ */ React7.createElement(
+      Search_default,
+      {
+        labels,
+        searchText: model.searchText,
+        handleSearchTextChange: (event) => model.update({ searchText: event.target.value, page: 0 })
+      }
+    ),
+    density: props.enableDensePadding && /* @__PURE__ */ React7.createElement(IconButton6, { "aria-label": labels.densePadding, onClick: () => setDense(!dense) }, /* @__PURE__ */ React7.createElement(DensityMediumIcon, null)),
+    sort: props.enableMultiColumnSort && /* @__PURE__ */ React7.createElement(
+      MultiColumnSort_default,
+      {
+        labels,
+        headers: headers.filter((h) => h.sortable !== false),
+        selectedColumns: model.sorting,
+        handleSortChange: (sorting) => model.update({ sorting, page: 0 })
+      }
+    ),
+    export: props.enableExport && /* @__PURE__ */ React7.createElement(
+      ExportOptions,
+      {
+        labels,
+        headers,
+        data: model.filteredRows,
+        pageTitle,
+        fetchAllRows: exportFetch,
+        onExportStart: props.onExportStart,
+        onExportComplete: props.onExportComplete,
+        onExportError: props.onExportError,
+        onExportCancel: props.onExportCancel,
+        exportOptions: props.exportOptions,
+        exportHandlers: props.exportHandlers,
+        state: {
+          page: model.page,
+          rowsPerPage: model.rowsPerPage,
+          sorting: model.sorting,
+          searchText: model.searchText,
+          columnFilters: model.columnFilters
+        },
+        disabled: loading || Boolean(error)
+      }
+    ),
+    themes: props.enableThemes && /* @__PURE__ */ React7.createElement(ThemeSelector_default, { labels, currentTheme: theme, handleThemeChange: setTheme }),
+    fullscreen: props.enableFullScreenOption && /* @__PURE__ */ React7.createElement(IconButton6, { "aria-label": labels.fullscreen, onClick: toggleFullscreen }, fullscreen ? /* @__PURE__ */ React7.createElement(FullscreenExitIcon, null) : /* @__PURE__ */ React7.createElement(FullscreenIcon, null)),
+    bulkActions: props.renderBulkActions ? props.renderBulkActions(bulkContext) : enableEmail && /* @__PURE__ */ React7.createElement(
+      IconButton6,
+      {
+        "aria-label": labels.sendEmail,
+        disabled: !onEmail || loading || Boolean(error),
+        onClick: () => onEmail(selectedRows.length ? selectedRows : model.filteredRows)
+      },
+      /* @__PURE__ */ React7.createElement(EmailIcon, null)
+    ),
+    custom: props.renderToolbar?.({ ...model, selectedRows, selection: bulkContext })
+  };
+  const arrangedControls = arrangeToolbarControls(controls, props.toolbarAlignment, props.toolbarPositions);
+  const firstRight = arrangedControls.findIndex((control) => control.side === "right");
+  const content = /* @__PURE__ */ React7.createElement(Root, { ...slotProps.root, ref, sx: [{ width: "100%", overflow: "auto", p: fullscreen ? 2 : 0 }, slotProps.root?.sx ?? {}] }, /* @__PURE__ */ React7.createElement(Toolbar, { ...slotProps.toolbar, direction: "row", spacing: 1, sx: [{ p: 1, alignItems: "center", flexWrap: "wrap" }, slotProps.toolbar?.sx ?? {}] }, pageTitle && /* @__PURE__ */ React7.createElement(Typography2, { component: "h2", variant: "h6", sx: { flexShrink: 0 } }, pageTitle), arrangedControls.map(({ id, node, side }, index) => /* @__PURE__ */ React7.createElement(React7.Fragment, { key: id }, index === firstRight && /* @__PURE__ */ React7.createElement(Box2, { "aria-hidden": "true", sx: { flexGrow: 1 } }), /* @__PURE__ */ React7.createElement(
+    Box2,
+    {
+      "data-table-toolbar-control": id,
+      "data-table-toolbar-side": side,
+      sx: { display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }
+    },
+    node
+  )))), fullscreenError && /* @__PURE__ */ React7.createElement(Alert2, { severity: "warning", onClose: () => setFullscreenError("") }, fullscreenError), error && /* @__PURE__ */ React7.createElement(Alert2, { severity: "error" }, error instanceof Error ? error.message : String(error)), loading && /* @__PURE__ */ React7.createElement(LinearProgress, { "aria-label": labels.loading }), model.sorting.length > 0 && /* @__PURE__ */ React7.createElement(Box2, { component: "span", role: "status", sx: { position: "absolute", width: 1, height: 1, overflow: "hidden", clipPath: "inset(50%)" } }, labels.sortSummary(model.sorting)), /* @__PURE__ */ React7.createElement(TableContainer, { sx: { maxHeight: props.maxHeight } }, /* @__PURE__ */ React7.createElement(
+    TableComponent,
+    {
+      ...slotProps.table,
+      stickyHeader: props.stickyHeader,
+      size: dense ? "small" : "medium",
+      "aria-label": props["aria-label"] ?? (pageTitle || labels.table),
+      "aria-busy": loading
+    },
+    /* @__PURE__ */ React7.createElement(Head, { ...slotProps.header }, /* @__PURE__ */ React7.createElement(Row, null, selectionEnabled ? insertSelectionCell(headerCells, selectionHeader, props.selectionColumnPosition) : headerCells)),
+    /* @__PURE__ */ React7.createElement(Body, { ...slotProps.body }, !error && model.rows.map((row, index) => {
+      const rowId = identify(row);
+      const cells = [
+        ...headers.map((header) => /* @__PURE__ */ React7.createElement(Cell, { ...slotProps.cell, key: `column-${header.field}`, align: header.align }, header.renderCell ? header.renderCell({ row, value: getColumnValue(row, header), rowIndex: index, rowId }) : getColumnText(row, header))),
+        ...hasActions ? [/* @__PURE__ */ React7.createElement(ActionCell, { key: "row-actions", ...slotProps.actionCell }, props.renderRowActions ? props.renderRowActions({ row, rowIndex: index, rowId }) : renderLegacyRowActions({ row, actions, icons: props.showActionIcons, visibility: props.actionVisibilityRules }))] : []
+      ];
+      return /* @__PURE__ */ React7.createElement(Row, { ...slotProps.row, key: rowId, selected: selectionEnabled && selected.has(rowId), hover: true }, selectionEnabled ? insertSelectionCell(cells, renderSelectionCell(row, index), props.selectionColumnPosition) : cells);
+    }), !loading && !error && model.rows.length === 0 && /* @__PURE__ */ React7.createElement(Row, null, /* @__PURE__ */ React7.createElement(Cell, { colSpan: Math.max(1, columnCount), align: "center" }, emptyDataMessage)))
+  )), /* @__PURE__ */ React7.createElement(
+    Footer,
+    {
+      ...slotProps.footer,
+      labels,
       count: model.count,
       page: model.page,
       rowsPerPage: model.rowsPerPage,
@@ -914,42 +834,14 @@ function DynamicTable(props) {
       onRowsPerPageChange: (event) => model.update({ rowsPerPage: Number(event.target.value), page: 0 })
     }
   ));
-  return props.enableThemes ? /* @__PURE__ */ React7.createElement(ThemeProvider, { theme: themes[theme] }, content) : /* @__PURE__ */ React7.createElement(Box2, null, content);
-}
-
-// src/spring.js
-function normalizeSpringPage(page) {
-  return { rows: page.content ?? [], rowCount: page.totalElements ?? 0, pageCount: page.totalPages ?? 0 };
-}
-function createSpringDataSource({ url, fetcher = fetch, params = {}, mapSort }) {
-  return async ({ pagination, sorting = [], globalFilter = "", columnFilters = [], signal }) => {
-    const [baseUrl, hash] = url.split("#", 2);
-    const [pathname, search = ""] = baseUrl.split("?", 2);
-    const query = new URLSearchParams(search);
-    Object.entries(params).forEach(([key, value]) => {
-      if (value != null) query.set(key, String(value));
-    });
-    query.set("page", String(pagination.pageIndex));
-    query.set("size", String(pagination.pageSize));
-    const sort = mapSort ? mapSort(sorting) : sorting.map(({ id, desc }) => `${id},${desc ? "desc" : "asc"}`);
-    query.delete("sort");
-    query.delete("search");
-    columnFilters.forEach(({ id }) => query.delete(`filter.${id}`));
-    sort.forEach((value) => query.append("sort", value));
-    if (globalFilter) query.set("search", globalFilter);
-    columnFilters.forEach(({ id, value }) => {
-      if (value !== "" && value != null) query.set(`filter.${id}`, String(value));
-    });
-    const response = await fetcher(`${pathname}?${query}${hash ? `#${hash}` : ""}`, { signal });
-    if (!response.ok) throw new Error(`Table request failed (${response.status})`);
-    return normalizeSpringPage(await response.json());
-  };
+  return props.enableThemes && theme !== "default" ? /* @__PURE__ */ React7.createElement(ThemeProvider, { theme: themes[theme] }, content) : /* @__PURE__ */ React7.createElement(Box2, null, content);
 }
 export {
   DynamicTable,
   buildRowModel,
   createPdfBlob,
   createSpringDataSource,
+  createTableState,
   createXlsxBlob,
   defaultExportHandlers,
   downloadBlob,
@@ -959,6 +851,7 @@ export {
   exportRowsAsTxt,
   exportRowsAsXlsx,
   exportWithEndpoint,
+  fetchAllSpringRows,
   getColumnText,
   getColumnValue,
   getExportData,
@@ -968,6 +861,7 @@ export {
   rowsToCsv,
   rowsToJson,
   rowsToTxt,
+  toSpringRequest,
   useTableModel
 };
 //# sourceMappingURL=index.js.map

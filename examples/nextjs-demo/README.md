@@ -1,6 +1,6 @@
 # Individual DynamicTable examples
 
-The catalog contains **53 separate examples**, one source file and route per implemented capability. It uses the public package API. Planned tree, grouping, persistence and advanced filter-dialog features are not part of the current implementation.
+The catalog contains **66 separate examples**, one source file and route per implemented capability. It uses the public package API. Planned tree, grouping, persistence and advanced filter-dialog features are not part of the current implementation.
 
 ## Run
 
@@ -36,7 +36,7 @@ Replace `loadPage` or the supplied mock `fetcher` with an application fetch inte
 
 Email controls preview recipients only. Legacy action examples report their callback invocation without deleting, cloning or sending records. Export examples download real files when activated. The custom-handler example instead reports the received export context. Browser fullscreen requires support and a user gesture.
 
-The controlled-page example demonstrates externally sliced local rows through the server pagination contract, so its external controls and built-in pager update the same parent-owned page.
+The controlled-page example demonstrates native partial controlled state in client mode; the external controls and built-in pager update the same parent-owned page. The controlled-query example shows full-query ownership and reset.
 
 ## Catalog
 
@@ -104,6 +104,7 @@ The controlled-page example demonstrates externally sliced local rows through th
 
 | Example | Source | Purpose |
 |---|---|---|
+| [Bounded Spring full export](http://localhost:3000/examples/spring-export) | [spring-export.jsx](examples/spring-export.jsx) | Fetch all pages with limits, progress and cancellation. |
 | [Full-result server export](http://localhost:3000/examples/server-export) | [server-export.jsx](examples/server-export.jsx) | Resolve every matching row before downloading a partial backend dataset. |
 | [Server pagination and cancellation](http://localhost:3000/examples/server-pagination) | [server-pagination.jsx](examples/server-pagination.jsx) | Fetch simulated pages and cancel obsolete queries. |
 | [Spring Data adapter](http://localhost:3000/examples/spring-adapter) | [spring-adapter.jsx](examples/spring-adapter.jsx) | Adapt pageable requests and Spring Page responses without a real server. |
@@ -147,3 +148,21 @@ The controlled-page example demonstrates externally sliced local rows through th
 5. Update this catalog and build the Next demo. Routes are generated from the catalog; source panels read only registered filenames.
 
 Keep each example focused. Shared data and mock transport can be reused, while the feature-defining configuration should remain visible in the individual file.
+
+## Hardening examples
+
+- [Controlled query state](examples/controlled-query.jsx) — `/examples/controlled-query`
+- [Controlled selection](examples/controlled-selection.jsx) — `/examples/controlled-selection`
+- [Component slots](examples/component-slots.jsx) — `/examples/component-slots`
+- [Localized labels](examples/localization.jsx) — `/examples/localization`
+- [Endpoint handler without row fetching](examples/endpoint-handler.jsx) — `/examples/endpoint-handler`
+
+## Generic bulk actions and layout
+
+- [Generic bulk remove/email actions](examples/bulk-actions.jsx) — `/examples/bulk-actions`
+- [Selection first](examples/selection-first.jsx) — `/examples/selection-first`
+- [Selection last](examples/selection-last.jsx) — `/examples/selection-last`
+- [Selection at a numeric position](examples/selection-position.jsx) — `/examples/selection-position`
+- [Toolbar left](examples/toolbar-left.jsx) — `/examples/toolbar-left`
+- [Toolbar right](examples/toolbar-right.jsx) — `/examples/toolbar-right`
+- [Split toolbar](examples/toolbar-split.jsx) — `/examples/toolbar-split`

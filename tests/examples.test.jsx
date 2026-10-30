@@ -57,6 +57,14 @@ describe('individual example catalog', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'CSV' }));
     await waitFor(() => expect(screen.getByText('The simulated export service is unavailable.')).toBeInTheDocument());
   });
+  it('cancels the full Spring export from the application-owned controls', async () => {
+    const Component = exampleComponents['spring-export'];
+    render(<Component />);
+    fireEvent.click(screen.getByRole('button', { name: 'Export all Spring rows' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel export' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Export cancelled.'));
+    expect(screen.getByRole('button', { name: 'Export all Spring rows' })).toBeEnabled();
+  });
   it('uses the custom JSON handler instead of a browser download', async () => {
     const createObjectURL = vi.fn();
     const original = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
@@ -73,4 +81,17 @@ describe('individual example catalog', () => {
       else delete URL.createObjectURL;
     }
   });
+});
+
+it('lets the generic bulk example preview email and remove only selected synthetic rows', () => {
+  const Component = exampleComponents['bulk-actions'];
+  render(<Component />);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select row 1', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Email selected', exact: true }));
+  expect(screen.getByRole('alert')).toHaveTextContent('Email preview: ada@example.test');
+  fireEvent.click(screen.getByRole('button', { name: 'Remove selected', exact: true }));
+  expect(screen.queryByRole('cell', { name: 'Ada', exact: true })).not.toBeInTheDocument();
+  expect(screen.getByRole('cell', { name: 'Grace', exact: true })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Restore data', exact: true }));
+  expect(screen.getByRole('cell', { name: 'Ada', exact: true })).toBeInTheDocument();
 });

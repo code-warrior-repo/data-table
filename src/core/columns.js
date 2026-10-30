@@ -9,6 +9,8 @@ export function normalizeColumns(headers = []) {
     if (typeof field !== 'string' || !field.trim() || used.has(field)) {
       throw new Error('Columns require unique, nonempty field or id strings.');
     }
+    if (column.dataType !== undefined && !['auto', 'string', 'number', 'boolean', 'date'].includes(column.dataType)) throw new Error('Invalid column dataType.');
+    if (column.nulls !== undefined && !['first', 'last'].includes(column.nulls)) throw new Error('Invalid column nulls policy.');
     used.add(field);
     return { ...column, field, label: column.label ?? field,
       ...(column.type === 'display' ? {
@@ -30,7 +32,7 @@ export function getColumnValue(row, column) {
 
 export function getColumnText(row, column) {
   const value = getColumnValue(row, column);
-  return toDisplayString(value, column.dateFormat) + (column.fields?.length ? '' : column.suffix ?? '');
+  return toDisplayString(value, column.dateFormat) + (!column.valueGetter && column.fields?.length ? '' : column.suffix ?? '');
 }
 
 export function headersToExportColumns(headers) {
@@ -38,6 +40,6 @@ export function headersToExportColumns(headers) {
     id: header.field,
     header: header.label,
     enableExport: header.type === 'display' ? false : header.enableExport,
-    exportValue: header.exportValue ?? (row => getColumnText(row, header))
+    exportValue: header.exportValue ?? (row => getColumnValue(row, header))
   }));
 }

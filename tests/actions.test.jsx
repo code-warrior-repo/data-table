@@ -46,9 +46,8 @@ describe('caller-defined row actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'View Ada' }));
     expect(view).toHaveBeenCalledWith('ada');
   });
-  it('uses the same rendering fallback ID for cells and row actions when no ID exists', () => {
-    const renderer = vi.fn(() => null);
-    render(<DynamicTable headers={headers} data={[{ name: 'No ID' }]} renderRowActions={renderer} />);
-    expect(renderer).toHaveBeenCalledWith({ row: { name: 'No ID' }, rowIndex: 0, rowId: 0 });
+  it('requires stable IDs for interactive rows', () => {
+    expect(() => render(<DynamicTable headers={headers} data={[{ name: 'No ID' }]} renderRowActions={() => null} />))
+      .toThrow('stable string or number ID');
   });
 });

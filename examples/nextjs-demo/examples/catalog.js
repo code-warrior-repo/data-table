@@ -316,5 +316,83 @@ export const examples = [
     "title": "Standalone serializers",
     "group": "Extension",
     "description": "Inspect CSV, TXT and JSON without creating a download."
+  },
+  {
+    "slug": "spring-export",
+    "title": "Bounded Spring full export",
+    "group": "Remote",
+    "description": "Fetch every matching Spring page with limits, progress and cancellation."
+  },
+  {
+    "slug": "controlled-query",
+    "title": "Controlled query state",
+    "group": "Query",
+    "description": "Reset search, filters, sorting and page from parent-owned state."
+  },
+  {
+    "slug": "component-slots",
+    "title": "Component slots",
+    "group": "Extension",
+    "description": "Replace wrappers while retaining controls and semantic markup."
+  },
+  {
+    "slug": "localization",
+    "title": "Localized labels",
+    "group": "Presentation",
+    "description": "Translate search and pagination labels."
+  },
+  {
+    "slug": "controlled-selection",
+    "title": "Controlled selection",
+    "group": "Actions",
+    "description": "Parent-owned selected IDs with explicit scope."
+  },
+  {
+    "slug": "endpoint-handler",
+    "title": "Endpoint handler without row fetching",
+    "group": "Output",
+    "description": "Skip row materialization for application-owned endpoint exports."
+  },
+  {
+    "slug": "bulk-actions",
+    "title": "Generic bulk actions",
+    "group": "Actions",
+    "description": "Select rows and remove records or preview email recipients using caller-owned handlers."
+  },
+  {
+    "slug": "selection-first",
+    "title": "Selection: first column",
+    "group": "Actions",
+    "description": "Put selection before all data columns (the default)."
+  },
+  {
+    "slug": "selection-last",
+    "title": "Selection: last column",
+    "group": "Actions",
+    "description": "Put selection after data and row-action columns."
+  },
+  {
+    "slug": "selection-position",
+    "title": "Selection: custom position",
+    "group": "Actions",
+    "description": "Insert selection at zero-based column position 1."
+  },
+  {
+    "slug": "toolbar-left",
+    "title": "Toolbar: left alignment",
+    "group": "Presentation",
+    "description": "Align toolbar controls to the left (the default)."
+  },
+  {
+    "slug": "toolbar-right",
+    "title": "Toolbar: right alignment",
+    "group": "Presentation",
+    "description": "Align toolbar controls to the right."
+  },
+  {
+    "slug": "toolbar-split",
+    "title": "Toolbar: split alignment",
+    "group": "Presentation",
+    "description": "Keep search left while export and theme controls align right."
   }
 ];

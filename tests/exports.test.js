@@ -86,3 +86,11 @@ describe('built-in export formats', () => {
     expect(text).not.toContain('private');
   });
 });
+it('does not invoke an endpoint for an already-cancelled download', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const fetcher = vi.fn();
+  await expect(exportWithEndpoint({ url: '/export', filename: 'a.csv', fetcher, signal: controller.signal }))
+    .rejects.toMatchObject({ name: 'AbortError' });
+  expect(fetcher).not.toHaveBeenCalled();
+});
