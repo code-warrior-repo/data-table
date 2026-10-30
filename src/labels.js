@@ -5,6 +5,8 @@ export const defaultTableLabels = {
   search: 'Search', openSearch: 'Open search', closeSearch: 'Close search',
   densePadding: 'Dense padding', fullscreen: 'Toggle fullscreen', loading: 'Loading rows',
   sortMenu: 'Multi-column sort', clearSorting: 'Clear Sorting', themeSelector: 'theme selector',
+  moveColumn: label => `Move ${label}`, resizeColumn: label => `Resize ${label}`,
+  moveColumnStart: 'Move toward start', moveColumnEnd: 'Move toward end', columnWidth: width => `${width} pixels`,
   filter: label => `Filter ${label}`, about: label => `About ${label}`,
   sortSummary: sorting => sorting.map((sort, index) => `${sort.field}: ${sort.order}, priority ${index + 1}`).join('; '),
   rowsPerPage: 'Rows per page:', firstPage: 'Go to first page', previousPage: 'Go to previous page',

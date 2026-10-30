@@ -2,6 +2,12 @@
 
 ## Unreleased — production hardening
 
+### Column layout
+
+- Added opt-in column movement by drag/drop, keyboard and menu, and pointer/keyboard resizing with per-column limits.
+- Added controlled/initial order and sizing APIs, callbacks and per-column movement/resize flags. Layout updates preserve query and selection state; exports follow display order.
+- Added separate reordering, resizing and controlled-layout examples with full API documentation.
+
 ### Pagination accessibility
 
 - Added explicit localized accessible names to the rows-per-page selector and its underlying input, retaining MUI’s visible label association.

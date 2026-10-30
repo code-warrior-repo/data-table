@@ -394,5 +394,23 @@ export const examples = [
     "title": "Toolbar: split alignment",
     "group": "Presentation",
     "description": "Keep search left while export and theme controls align right."
+  },
+  {
+    "slug": "column-reordering",
+    "title": "Column reordering",
+    "group": "Presentation",
+    "description": "Move columns by drag/drop, keyboard or menu; utility columns retain their positions."
+  },
+  {
+    "slug": "column-resizing",
+    "title": "Column resizing",
+    "group": "Presentation",
+    "description": "Resize columns with pointer or keyboard controls and per-column width limits."
+  },
+  {
+    "slug": "controlled-column-layout",
+    "title": "Controlled column layout",
+    "group": "Presentation",
+    "description": "Control order and pixel widths in the parent, lock a column and reset the layout."
   }
 ];

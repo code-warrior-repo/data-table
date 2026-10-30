@@ -7,9 +7,13 @@ type Person = { id: number; name: string };
 const rows: Person[] = [{ id: 1, name: 'Ada' }];
 const headers: Column<Person>[] = [{ field: 'name', renderCell: ({ row }) => row.name }];
 export function Consumer() {
+  const [columnOrder, setColumnOrder] = useState<string[]>(['name']);
+  const [columnSizing, setColumnSizing] = useState<Record<string, number>>({ name: 200 });
   const [state, setState] = useState<TableState>(() => createTableState());
   return <DynamicTable headers={headers} data={rows} state={state} onStateChange={setState}
     getRowId={row => row.id} labels={{ search: 'Find' }} slots={{ toolbar: 'section' }}
+    enableColumnReordering columnOrder={columnOrder} onColumnOrderChange={setColumnOrder}
+    enableColumnResizing columnSizing={columnSizing} onColumnSizingChange={setColumnSizing} minColumnWidth={80}
     selectionColumnPosition="first" toolbarAlignment="left" toolbarPositions={{ export: 'right' }}
     renderBulkActions={({ selectedRows, clearSelection }) => <button onClick={clearSelection}>{selectedRows[0]?.name}</button>}
     selectedRowIds={[1]} onSelectionChange={ids => console.log(ids)}

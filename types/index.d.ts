@@ -36,6 +36,8 @@ export interface TableLabels {
   table: string; empty: string; actions: string; email: string; sendEmail: string; selectAllEmails: string;
   selectEmailRow: (index: number) => string; search: string; openSearch: string; closeSearch: string;
   densePadding: string; fullscreen: string; loading: string; sortMenu: string; clearSorting: string; themeSelector: string;
+  moveColumn: (label: string) => string; resizeColumn: (label: string) => string;
+  moveColumnStart: string; moveColumnEnd: string; columnWidth: (width: number) => string;
   filter: (label: string) => string; about: (label: string) => string; sortSummary: (sorting: Sort[]) => string;
   rowsPerPage: string; firstPage: string; previousPage: string; nextPage: string; lastPage: string;
   displayedRows: (range: { from: number; to: number; count: number }) => string;
@@ -49,6 +51,11 @@ export interface BulkActionContext<Row> {
 export interface DynamicTableProps<Row> extends TableModelOptions<Row> {
   getRowId?: (row: Row) => RowId; uniqueField?: string; pageTitle?: string; 'aria-label'?: string;
   searchByText?: boolean; enableSearch?: boolean; enableColumnFilters?: boolean; enableMultiColumnSort?: boolean;
+  enableColumnReordering?: boolean; columnOrder?: string[]; initialColumnOrder?: string[];
+  onColumnOrderChange?: (order: string[]) => void;
+  enableColumnResizing?: boolean; columnSizing?: Record<string, number>; initialColumnSizing?: Record<string, number>;
+  onColumnSizingChange?: (sizing: Record<string, number>) => void;
+  defaultColumnWidth?: number; minColumnWidth?: number; maxColumnWidth?: number;
   rowsPerPageOptions?: (number | { value: number; label: string })[];
   renderRowActions?: (context: RowContext<Row>) => ReactNode; enableRowActions?: boolean; actionsColumnLabel?: ReactNode;
   actions?: Action<Row>[]; showActionIcons?: boolean; actionVisibilityRules?: Record<string, (row: Row) => boolean>;

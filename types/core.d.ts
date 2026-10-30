@@ -17,6 +17,7 @@ export interface Column<Row, Value = unknown> {
   sortComparator?: (a: Value, b: Value) => number;
   filterFn?: (value: Value, filter: unknown, row: Row) => boolean;
   enableExport?: boolean; exportValue?: (row: Row, index: number) => unknown;
+  resizable?: boolean; reorderable?: boolean; minWidth?: number; maxWidth?: number;
   width?: CSSProperties['width']; align?: 'left' | 'right' | 'center' | 'justify' | 'inherit';
 }
 export interface NormalizedColumn<Row, Value = unknown> extends Column<Row, Value> { field: string; label: string }

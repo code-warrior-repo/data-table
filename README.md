@@ -310,9 +310,47 @@ Unknown props are not automatically forwarded to MUI components. Use the explici
 
 Slots must forward provided children, props and refs where applicable and preserve native table semantics. Header/body/row/cell slots replace wrappers around the working controls. Footer receives `count`, `page`, `rowsPerPage`, change callbacks, size options and labels. Action cells are separate from data cells. `renderToolbar` still appends content; the toolbar slot controls its wrapper.
 
-String labels: `selection`, `selectAllRows`, `table`, `empty`, `actions`, `email`, `sendEmail`, `selectAllEmails`, `search`, `openSearch`, `closeSearch`, `densePadding`, `fullscreen`, `loading`, `sortMenu`, `clearSorting`, `themeSelector`, `rowsPerPage`, `firstPage`, `previousPage`, `nextPage`, `lastPage`, `exportMenu`, `exporting`, `cancelExport`.
+String labels: `selection`, `selectAllRows`, `table`, `empty`, `actions`, `email`, `sendEmail`, `selectAllEmails`, `search`, `openSearch`, `closeSearch`, `densePadding`, `fullscreen`, `loading`, `sortMenu`, `clearSorting`, `themeSelector`, `rowsPerPage`, `firstPage`, `previousPage`, `nextPage`, `lastPage`, `exportMenu`, `exporting`, `cancelExport`, `moveColumnStart`, `moveColumnEnd`.
 
 Formatter labels: `selectRow(index)`, `selectEmailRow(index)`, `filter(columnLabel)`, `about(columnLabel)`, `sortSummary(sorting)`, `displayedRows({from,to,count})`, `exportProgress({loaded,total})`. Labels cover built-in control names; column labels, action labels, format names, preset names and application error messages remain application content. Translate size-option text such as All via `rowsPerPageOptions`.
+
+Layout labels: `moveColumn(label)`, `resizeColumn(label)`, `columnWidth(width)`, `moveColumnStart`, and `moveColumnEnd` can be customized through `labels`.
+
+## Column movement and resizing
+
+Both interactions are opt-in and use JavaScript/MUI without a table-engine dependency.
+
+| Prop | Type | Default | Behavior |
+|---|---|---|---|
+| `enableColumnReordering` | `boolean` | `false` | Show a draggable move button and a move menu in each movable header. |
+| `columnOrder` | `string[]` | uncontrolled | Controlled display order, keyed by resolved column `field`. |
+| `initialColumnOrder` | `string[]` | header order | Initial uncontrolled order; read once. |
+| `onColumnOrderChange` | `(order: string[]) => void` | unset | Receives the complete proposed order on an interactive move. |
+| `enableColumnResizing` | `boolean` | `false` | Show resize dividers and use fixed table layout with explicit pixel widths. |
+| `columnSizing` | `Record<string, number>` | uncontrolled | Controlled pixel widths, keyed by resolved column `field`. |
+| `initialColumnSizing` | `Record<string, number>` | column widths | Initial uncontrolled widths; read once. |
+| `onColumnSizingChange` | `(sizing: Record<string, number>) => void` | unset | Receives complete proposed pixel widths during pointer or keyboard resizing. |
+| `defaultColumnWidth` | `number` | `180` | Width for columns without a numeric or pixel-string `width`. |
+| `minColumnWidth` | `number` | `80` | Default minimum pixel width. |
+| `maxColumnWidth` | `number` | `800` | Default maximum pixel width. |
+
+```jsx
+const [columnOrder, setColumnOrder] = useState(['name', 'status', 'score']);
+const [columnSizing, setColumnSizing] = useState({ name: 220 });
+<DynamicTable headers={headers} data={rows}
+  enableColumnReordering enableColumnResizing
+  columnOrder={columnOrder} onColumnOrderChange={setColumnOrder}
+  columnSizing={columnSizing} onColumnSizingChange={setColumnSizing}
+/>
+```
+
+Drag the move button onto a destination header, press Left/Right while the button has focus, or click it to open the move menu (also available on touch devices). Column `reorderable: false` keeps that data column in its current slot during interactive moves; other movable columns pass around it. Selection and action columns remain at their configured positions. Explicit parent ordering can reposition a locked data column.
+
+Resize a header’s end divider with a mouse/touch/pen, or focus it and use Left/Right (10px), Shift+Left/Right (50px), Home (minimum) or End (maximum). Directions follow RTL themes. Use column `resizable: false` to hide its resize control. Per-column `minWidth`/`maxWidth` override table defaults; widths are clamped to those bounds. Widths and bounds must be finite positive numbers and minimum must not exceed maximum. In resize mode, numeric and `px` column widths supply initial sizes; percentage/other CSS widths use `defaultColumnWidth`. Selection/action widths are 140px/160px. The table scrolls horizontally when its total width exceeds the container; long text wraps. Custom renderers must fit their columns.
+
+Order and widths are independent of query state: layout changes preserve sorting, filters, pagination and selection, and do not call query callbacks or refetch server rows. Exports use the displayed data-column order. Unknown ordered fields are ignored and newly added fields append in header order; duplicate order entries are rejected. Surviving column settings are tracked by field. Callbacks run for user changes, not mounting or parent updates. Controlled layouts render after parent acceptance; keep the corresponding callback state in the parent. Persistence is caller-owned (for example, store these props as user preferences).
+
+Individual examples: [reordering](examples/nextjs-demo/examples/column-reordering.jsx), [resizing](examples/nextjs-demo/examples/column-resizing.jsx), [controlled layout and reset](examples/nextjs-demo/examples/controlled-column-layout.jsx).
 
 ## Column parameters
 
@@ -340,7 +378,10 @@ Formatter labels: `selectRow(index)`, `selectEmailRow(index)`, `filter(columnLab
 | `filterFn` | `(value, filter, row) => boolean` | case-insensitive substring | Replace local matching for a nonempty filter. Built-in UI supplies string filters. |
 | `enableExport` | `boolean` | `true` | Include the column in every built-in export format. |
 | `exportValue` | `(row, index) => value` | `getColumnValue(row, column)` | Export-specific value, independent of rendered React nodes. `index` is within the exported row collection. |
-| `width` | `number or CSS width string` | unset | Header-cell width; numeric values use pixels. |
+| `width` | `number or CSS width string` | unset | Header width; numeric values use pixels. In resize mode, numeric/`px` values initialize the column size. |
+| `minWidth` / `maxWidth` | `number` | table defaults | Pixel bounds in resize mode. |
+| `resizable` | `boolean` | `true` | Show this column’s resize control when resizing is enabled. |
+| `reorderable` | `boolean` | `true` | Allow interactive moves when reordering is enabled; false retains its current slot. |
 | `align` | `'left'`, `'center'`, `'right'`, `'justify'` or `'inherit'` | MUI default | Header/body alignment. |
 
 Column identities must be unique after resolving `field ?? id`. A display column forcibly disables `sortable`, `searchable`, `filterable` and `enableExport` even if those flags are supplied as `true`; its `valueGetter` is not used. Use `renderCell` for its content.

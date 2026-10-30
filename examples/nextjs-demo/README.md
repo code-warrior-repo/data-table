@@ -1,6 +1,6 @@
 # Individual DynamicTable examples
 
-The catalog contains **66 separate examples**, one source file and route per implemented capability. It uses the public package API. Planned tree, grouping, persistence and advanced filter-dialog features are not part of the current implementation.
+The catalog contains **69 separate examples**, one source file and route per implemented capability. It uses the public package API. Planned tree, grouping, persistence and advanced filter-dialog features are not part of the current implementation.
 
 ## Run
 
@@ -166,3 +166,7 @@ Keep each example focused. Shared data and mock transport can be reused, while t
 - [Toolbar left](examples/toolbar-left.jsx) — `/examples/toolbar-left`
 - [Toolbar right](examples/toolbar-right.jsx) — `/examples/toolbar-right`
 - [Split toolbar](examples/toolbar-split.jsx) — `/examples/toolbar-split`
+
+| [Column reordering](http://localhost:3000/examples/column-reordering) | [column-reordering.jsx](examples/column-reordering.jsx) | Move columns by drag/drop, keyboard or menu; utility columns retain their positions. |
+| [Column resizing](http://localhost:3000/examples/column-resizing) | [column-resizing.jsx](examples/column-resizing.jsx) | Resize columns with pointer or keyboard controls and per-column width limits. |
+| [Controlled column layout](http://localhost:3000/examples/controlled-column-layout) | [controlled-column-layout.jsx](examples/controlled-column-layout.jsx) | Control order and pixel widths in the parent, lock a column and reset the layout. |

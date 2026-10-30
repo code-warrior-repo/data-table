@@ -14,6 +14,8 @@ import ThemeSelector from './ThemeSelector';
 import { defaultTableLabels } from './labels.js';
 import { createTableTheme } from './themes';
 import { StyledActionTableCell, StyledTableCell, StyledTableRow } from './StyledComponents';
+import ColumnHeaderControls from './ColumnHeaderControls';
+import { useColumnLayout } from './hooks/useColumnLayout.js';
 import CustomTablePagination from './CustomTablePagination';
 import { insertSelectionCell, arrangeToolbarControls } from './core/layout.js';
 import { rowIdentities } from './core/identity.js';
@@ -36,8 +38,11 @@ export default function DynamicTable(props) {
   const selectionEnabled = Boolean(props.enableRowSelection || enableEmail);
   const selectionLabel = props.selectionColumnLabel ?? (props.enableRowSelection ? labels.selection : labels.email);
   const selectAllLabel = props.enableRowSelection ? labels.selectAllRows : labels.selectAllEmails;
-  const headers = useMemo(() => normalizeColumns(props.headers), [props.headers]);
-  const model = useTableModel({ ...props, headers });
+  const normalizedHeaders = useMemo(() => normalizeColumns(props.headers), [props.headers]);
+  const model = useTableModel({ ...props, headers: normalizedHeaders });
+  const layout = useColumnLayout(normalizedHeaders, props);
+  const headers = layout.headers;
+  const resizing = Boolean(props.enableColumnResizing);
   const [theme, setTheme] = useState('default');
   const applicationTheme = useTheme();
   const activeTheme = useMemo(() => createTableTheme(applicationTheme, props.enableThemes ? theme : 'default'),
@@ -117,8 +122,11 @@ export default function DynamicTable(props) {
   const selectionHeader = (<Cell key="selection-column"><Checkbox slotProps={{ input: { 'aria-label': selectAllLabel } }} disabled={loading || Boolean(error)} checked={allSelected}
             indeterminate={selectedInScope > 0 && !allSelected} onChange={event => toggleAllRows(event.target.checked)} />{selectionLabel}</Cell>);
   const headerCells = [
-          ...headers.map(header => <Cell {...slotProps.cell} key={`column-${header.field}`} style={{ width: header.width }}
+          ...headers.map(header => <Cell {...slotProps.cell} key={`column-${header.field}`} style={{ ...slotProps.cell?.style, width: resizing ? layout.sizing[header.field] : header.width, ...(resizing ? { position: props.stickyHeader ? 'sticky' : 'relative' } : {}), ...(resizing && header.resizable !== false ? { paddingInlineEnd: 14 } : {}) }}
+            data-column-field={header.field} {...(props.enableColumnReordering && header.reorderable !== false ? layout.dropProps(header.field) : {})}
             align={header.align} sortDirection={sort?.field === header.field ? sort.order : false}>
+            {(props.enableColumnReordering || resizing) && <ColumnHeaderControls column={header} layout={layout} labels={labels} direction={activeTheme.direction}
+              reorder={props.enableColumnReordering && header.reorderable !== false} resize={resizing && header.resizable !== false} />}
             {header.sortable === false ? header.label : <TableSortLabel active={sort?.field === header.field}
               direction={sort?.field === header.field ? sort.order : 'asc'} onClick={() => model.update({ page: 0,
                 sorting: [{ field: header.field, order: sort?.field === header.field && sort.order === 'asc' ? 'desc' : 'asc' }] })}>
@@ -171,7 +179,18 @@ export default function DynamicTable(props) {
     {model.sorting.length > 0 && <Box component="span" role="status" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }}>{labels.sortSummary(model.sorting)}</Box>}
     <TableContainer sx={{ maxHeight: props.maxHeight }}>
       <TableComponent {...slotProps.table} stickyHeader={props.stickyHeader} size={dense ? 'small' : 'medium'}
+        sx={[...(Array.isArray(slotProps.table?.sx) ? slotProps.table.sx : [slotProps.table?.sx ?? {}]),
+          ...(resizing ? [{ tableLayout: 'fixed', width: headers.reduce((sum, header) => sum + layout.sizing[header.field], 0) + Number(selectionEnabled) * 140 + Number(hasActions) * 160 }] : [])]}
         aria-label={props['aria-label'] ?? (pageTitle || labels.table)} aria-busy={loading}>
+        {resizing && <colgroup>
+          {(selectionEnabled ? insertSelectionCell([
+            ...headers.map(header => <col key={header.field} style={{ width: layout.sizing[header.field] }} />),
+            ...(hasActions ? [<col key="row-actions" style={{ width: 160 }} />] : []),
+          ], <col key="selection-column" style={{ width: 140 }} />, props.selectionColumnPosition) : [
+            ...headers.map(header => <col key={header.field} style={{ width: layout.sizing[header.field] }} />),
+            ...(hasActions ? [<col key="row-actions" style={{ width: 160 }} />] : []),
+          ])}
+        </colgroup>}
         <Head {...slotProps.header}><Row>
           {selectionEnabled ? insertSelectionCell(headerCells, selectionHeader, props.selectionColumnPosition) : headerCells}
         </Row></Head>
@@ -179,7 +198,8 @@ export default function DynamicTable(props) {
           {!error && model.rows.map((row, index) => {
             const rowId = identify(row);
             const cells = [
-            ...headers.map(header => <Cell {...slotProps.cell} key={`column-${header.field}`} align={header.align}>
+            ...headers.map(header => <Cell {...slotProps.cell} key={`column-${header.field}`} align={header.align}
+              sx={[...(Array.isArray(slotProps.cell?.sx) ? slotProps.cell.sx : [slotProps.cell?.sx ?? {}]), ...(resizing ? [{ overflowWrap: 'anywhere' }] : [])]}>
               {header.renderCell ? header.renderCell({ row, value: getColumnValue(row, header), rowIndex: index, rowId }) : getColumnText(row, header)}
             </Cell>),
             ...(hasActions ? [<ActionCell key="row-actions" {...slotProps.actionCell}>

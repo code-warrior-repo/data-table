@@ -1,4 +1,7 @@
 'use client';
+import ColumnLayoutExample0 from './column-reordering';
+import ColumnLayoutExample1 from './column-resizing';
+import ColumnLayoutExample2 from './controlled-column-layout';
 import LayoutExample0 from './bulk-actions';
 import LayoutExample1 from './selection-first';
 import LayoutExample2 from './selection-last';
@@ -67,6 +70,10 @@ import Example51 from './blob-builders';
 import Example52 from './serialization';
 
 export const exampleComponents = {
+  'column-reordering': ColumnLayoutExample0,
+  'column-resizing': ColumnLayoutExample1,
+  'controlled-column-layout': ColumnLayoutExample2,
+
   'bulk-actions': LayoutExample0,
   'selection-first': LayoutExample1,
   'selection-last': LayoutExample2,
