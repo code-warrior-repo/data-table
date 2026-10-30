@@ -105,3 +105,55 @@ test(`rows-per-page dropdown meets text contrast in every preset with ${applicat
   }
 });
 }
+
+test('columns move by drag, keyboard and menu without losing row selection', async ({ page }) => {
+  await page.goto('/examples/column-reordering');
+  const table = page.getByRole('table');
+  const order = () => table.locator('th[data-column-field]').evaluateAll(cells => cells.map(cell => cell.dataset.columnField));
+  await page.getByRole('checkbox', { name: 'Select row 1', exact: true }).check();
+  await page.getByRole('button', { name: 'Move Name', exact: true }).dragTo(table.locator('th[data-column-field="score"]'));
+  expect(await order()).toEqual(['status', 'score', 'name']);
+  await expect(table.getByRole('row').nth(1).getByRole('cell').nth(1)).toHaveText('Active');
+  await expect(page.getByRole('checkbox', { name: 'Select row 1', exact: true })).toBeChecked();
+  await page.getByRole('button', { name: 'Move Name', exact: true }).focus();
+  await page.keyboard.press('ArrowLeft');
+  expect(await order()).toEqual(['status', 'name', 'score']);
+  await page.getByRole('button', { name: 'Move Name', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Move toward start', exact: true }).click();
+  expect(await order()).toEqual(['name', 'status', 'score']);
+  const result = await new AxeBuilder({ page }).include('.MuiTableContainer-root').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  expect(result.violations).toEqual([]);
+});
+
+test('columns resize with actual pointer and keyboard controls and parent reset', async ({ page }) => {
+  await page.goto('/examples/column-resizing');
+  const header = page.locator('th[data-column-field="name"]');
+  const separator = page.getByRole('separator', { name: 'Resize Name', exact: true });
+  const before = await header.boundingBox();
+  const handle = await separator.boundingBox();
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 70, handle.y + handle.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect(separator).toHaveAttribute('aria-valuenow', '250');
+  const after = await header.boundingBox();
+  expect(after.width - before.width).toBeCloseTo(70, 0);
+  await separator.focus();
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect(separator).toHaveAttribute('aria-valuenow', '300');
+  await page.keyboard.press('End');
+  await expect(separator).toHaveAttribute('aria-valuenow', '400');
+  const result = await new AxeBuilder({ page }).include('.MuiTableContainer-root').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  expect(result.violations).toEqual([]);
+  await page.goto('/examples/controlled-column-layout');
+  await expect(page.getByRole('separator', { name: 'Resize Status', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Move Name', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('status')).toHaveText('Column order: score, status, name. Status has a fixed position and width.');
+  await page.getByRole('separator', { name: 'Resize Name', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('separator', { name: 'Resize Name', exact: true })).toHaveAttribute('aria-valuenow', '230');
+  await page.getByRole('button', { name: 'Reset column layout', exact: true }).click();
+  await expect(page.getByRole('separator', { name: 'Resize Name', exact: true })).toHaveAttribute('aria-valuenow', '220');
+  await expect(page.getByRole('status')).toHaveText('Column order: name, status, score. Status has a fixed position and width.');
+});
