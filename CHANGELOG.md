@@ -2,6 +2,12 @@
 
 ## Unreleased — production hardening
 
+### GitHub Actions releases
+
+- Added gated Artifactory releases for stable master and test prerelease branches, with a first stable version of 1.0.0 and external shell version computation.
+- Added synchronized package/version metadata, LCOV, Sonar and Black Duck gates, immutable-artifact retry handling, bot-commit loop protection and final summaries.
+- Added release-script tests and a setup/recovery guide.
+
 ### Complete pagination examples
 
 - Added complete client/server pagination demos combining query controls, generic actions, layout controls, typed columns and all export formats.

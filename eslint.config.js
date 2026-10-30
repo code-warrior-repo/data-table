@@ -2,7 +2,12 @@ import globals from 'globals';
 import hooks from 'eslint-plugin-react-hooks';
 
 export default [
-  { ignores: ['dist/**', '**/node_modules/**', '**/.next/**'] },
+  { ignores: ['dist/**', 'coverage/**', 'playwright-report/**', 'test-results/**', '**/node_modules/**', '**/.next/**'] },
+  {
+    files: ['scripts/**/*.mjs', 'tests/**/*.mjs'],
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: globals.node },
+    rules: { 'no-unused-vars': 'error' }
+  },
   {
     files: ['src/**/*.{js,jsx}', 'tests/**/*.{js,jsx}', 'examples/**/*.{js,jsx}'],
     languageOptions: {

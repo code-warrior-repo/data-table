@@ -4,6 +4,8 @@ permissions:
   contents: read
 jobs:
   unit-and-types:
+    if: >-
+      github.event_name != 'push' || github.actor != 'github-actions[bot]' || !startsWith(github.event.head_commit.message, 'chore(release): ')
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -17,10 +19,13 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm install --no-save --ignore-scripts react@${{ matrix.react }} react-dom@${{ matrix.react }}
+      - run: npm run test:release
       - run: npm run check
       - run: npm run test:package
       - run: npm audit --omit=dev --audit-level=high
   browser:
+    if: >-
+      github.event_name != 'push' || github.actor != 'github-actions[bot]' || !startsWith(github.event.head_commit.message, 'chore(release): ')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

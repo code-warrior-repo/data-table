@@ -1,0 +1,203 @@
+name: Release to Artifactory
+
+on:
+  push:
+    branches: [master, test]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Stable version bump (test normally increments its prerelease counter)
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: artifactory-release-${{ github.repository }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      github.ref_type == 'branch' &&
+      (github.ref_name == 'master' || github.ref_name == 'test') &&
+      !(github.event_name == 'push' && github.actor == 'github-actions[bot]' && startsWith(github.event.head_commit.message, 'chore(release): '))
+    runs-on: ${{ vars.RELEASE_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION_FILE: ${{ vars.VERSION_FILE || 'package.json' }}
+      VERSION_BUMP: ${{ inputs.bump || vars.VERSION_BUMP || 'patch' }}
+      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+      BLACKDUCK_URL: ${{ vars.BLACKDUCK_URL }}
+      BLACKDUCK_FAILURE_SEVERITIES: ${{ vars.BLACKDUCK_FAILURE_SEVERITIES || 'BLOCKER,CRITICAL' }}
+      ARTIFACTORY_NPM_REGISTRY: ${{ vars.ARTIFACTORY_NPM_REGISTRY }}
+
+    steps:
+      - name: Checkout latest release branch
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Set up Node
+        id: node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Read current version and branch baseline
+        id: plan
+        run: node scripts/release-version.mjs plan "$GITHUB_REF_NAME" "$GITHUB_EVENT_NAME" "$VERSION_FILE"
+
+      - name: Compute version using external shell script
+        id: version
+        if: steps.plan.outputs.required == 'true'
+        env:
+          CURRENT_VERSION: ${{ steps.plan.outputs.current_version }}
+          MASTER_VERSION: ${{ steps.plan.outputs.master_version }}
+        run: |
+          next_version=$(bash scripts/compute-version.sh "$CURRENT_VERSION" "$GITHUB_REF_NAME" "$VERSION_BUMP" "$MASTER_VERSION")
+          printf 'next_version=%s\n' "$next_version" >> "$GITHUB_OUTPUT"
+
+      - name: Generate or update version metadata
+        id: metadata
+        if: steps.plan.outputs.required == 'true'
+        env:
+          CURRENT_VERSION: ${{ steps.plan.outputs.current_version }}
+          NEXT_VERSION: ${{ steps.version.outputs.next_version }}
+        run: node scripts/release-version.mjs write "$NEXT_VERSION" "$VERSION_FILE" "$CURRENT_VERSION"
+
+      - name: Validate scanner and registry configuration
+        id: config
+        if: steps.plan.outputs.required == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          BLACKDUCK_TOKEN: ${{ secrets.BLACKDUCK_TOKEN }}
+          ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+        run: node scripts/check-release-config.mjs
+
+      - name: Install locked dependencies
+        id: install
+        if: steps.plan.outputs.required == 'true'
+        run: npm ci --ignore-scripts
+
+      - name: Tests, coverage and declaration checks
+        id: tests
+        if: steps.plan.outputs.required == 'true'
+        run: |
+          npm run test:coverage
+          npm run test:release
+          npm run typecheck
+          test -s coverage/lcov.info
+
+      - name: Lint
+        id: lint
+        if: steps.plan.outputs.required == 'true'
+        run: npm run lint
+
+      - name: Sonar analysis and quality gate
+        id: sonar
+        if: steps.plan.outputs.required == 'true'
+        timeout-minutes: 20
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >-
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.projectVersion=${{ steps.version.outputs.next_version }}
+            -Dsonar.branch.name=${{ github.ref_name }}
+            -Dsonar.scm.revision=${{ steps.plan.outputs.source_sha }}
+            ${{ vars.SONAR_ORGANIZATION && format('-Dsonar.organization={0}', vars.SONAR_ORGANIZATION) || '' }}
+
+      - name: Black Duck full scan and policy gate
+        id: blackduck
+        if: steps.plan.outputs.required == 'true'
+        timeout-minutes: 30
+        uses: blackduck-inc/black-duck-security-scan@152247222aa9cd38124acd5c0cf60f4db71adc3f # v2.11.0
+        env:
+          DETECT_PROJECT_NAME: ${{ vars.BLACKDUCK_PROJECT_NAME || github.event.repository.name }}
+          DETECT_PROJECT_VERSION_NAME: ${{ steps.version.outputs.next_version }}
+        with:
+          blackducksca_url: ${{ vars.BLACKDUCK_URL }}
+          blackducksca_token: ${{ secrets.BLACKDUCK_TOKEN }}
+          blackducksca_scan_full: true
+          blackducksca_waitForScan: true
+          blackducksca_scan_failure_severities: ${{ vars.BLACKDUCK_FAILURE_SEVERITIES || 'BLOCKER,CRITICAL' }}
+
+      - name: Build and pack exact release artifact
+        id: build
+        if: steps.plan.outputs.required == 'true'
+        run: |
+          npm run build
+          npm pack --ignore-scripts --json > "$RUNNER_TEMP/npm-pack.json"
+
+      - name: Stop if the source branch advanced
+        id: freshness
+        if: steps.plan.outputs.required == 'true'
+        env:
+          SOURCE_SHA: ${{ steps.plan.outputs.source_sha }}
+        run: |
+          remote_sha=$(git ls-remote --exit-code origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)
+          if [[ "$remote_sha" != "$SOURCE_SHA" ]]; then
+            echo 'Source branch advanced during qualification; retry on the latest source.' >&2
+            exit 1
+          fi
+
+      - name: Publish to Artifactory
+        id: publish
+        if: steps.plan.outputs.required == 'true'
+        env:
+          ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+          PACK_MANIFEST: ${{ runner.temp }}/npm-pack.json
+          RELEASE_DIST_TAG: ${{ steps.plan.outputs.dist_tag }}
+        run: node scripts/publish-artifactory.mjs
+
+      - name: Commit and push version metadata without retriggering CI
+        id: commit
+        if: steps.plan.outputs.required == 'true'
+        env:
+          NEXT_VERSION: ${{ steps.version.outputs.next_version }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- package.json package-lock.json
+          if [[ -f version.json ]]; then git add -- version.json; fi
+          if [[ -f examples/nextjs-demo/package-lock.json ]]; then git add -- examples/nextjs-demo/package-lock.json; fi
+          git commit -m "chore(release): $NEXT_VERSION [skip ci]"
+          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+          printf 'version_commit=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Release summary
+        if: always()
+        env:
+          RELEASE_STATUS: ${{ job.status }}
+          RELEASE_STEPS: ${{ toJSON(steps) }}
+          RELEASE_PACKAGE: ${{ steps.plan.outputs.package_name }}
+          PREVIOUS_VERSION: ${{ steps.plan.outputs.current_version }}
+          NEXT_VERSION: ${{ steps.version.outputs.next_version }}
+          RELEASE_DIST_TAG: ${{ steps.plan.outputs.dist_tag }}
+          RELEASE_SOURCE_SHA: ${{ steps.plan.outputs.source_sha }}
+          VERSION_COMMIT: ${{ steps.commit.outputs.version_commit }}
+          VERSION_FILES: ${{ steps.metadata.outputs.files }}
+          RELEASE_REGISTRY: ${{ steps.publish.outputs.registry }}
+          PUBLICATION: ${{ steps.publish.outputs.publication }}
+          RELEASE_INTEGRITY: ${{ steps.publish.outputs.integrity }}
+        run: |
+          if [[ -f scripts/release-summary.mjs ]] && command -v node >/dev/null; then
+            node scripts/release-summary.mjs
+          else
+            printf '## Release summary\n\nResult: %s. Checkout or Node setup failed; see the step logs.\n' "$RELEASE_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          fi

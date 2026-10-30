@@ -16,6 +16,7 @@ A modular JavaScript React table built with Material UI, with local or caller-ma
 - [Export functions and parameters](#export-functions-and-parameters)
 - [Spring Data functions and parameters](#spring-data-functions-and-parameters)
 - [Behavior, validation and migration](#behavior-validation-and-migration)
+- [Release pipeline](#release-pipeline)
 
 ## Setup and quick start
 
@@ -874,3 +875,11 @@ The implementation separates column access (`src/core/columns.js`), row processi
 ## Release qualification
 
 `npm run check` runs lint, strict public type checks, unit/interaction tests and the library build. `npm run test:package` installs a tarball into a fresh temporary consumer and verifies declarations, environment boundaries and helper imports. Build the demo and install Playwright browsers before `npm run test:browser`. `npm run benchmark` prints a synthetic row-model baseline. See [hardening status](docs/hardening-status.md) for CI coverage and remaining release gates, including dependency findings and the license decision.
+
+## Release pipeline
+
+The [Artifactory release workflow](.github/workflows/release.yml) runs on `master` and `test`: checkout → Node → external shell version calculation → metadata update → `npm ci` → coverage/tests/types → lint → Sonar gate → Black Duck gate → build/pack → Artifactory → Git version push → always-run summary.
+
+Master starts at **1.0.0** and publishes stable versions under `latest`. Test publishes **1.0.1-test.0**, **1.0.1-test.1**, etc. under `test` (npm uses a hyphen before prerelease identifiers). `package.json` is the default source; `VERSION_FILE=version.json` enables a generated/separate source while keeping npm metadata and lock references synchronized. Bot commits use `[skip ci]` and `GITHUB_TOKEN` to prevent another pipeline run.
+
+See [release setup, variables/secrets, branch version rules and retry recovery](docs/release-pipeline.md). Configure Sonar, Black Duck and Artifactory before the first Actions release. `npm run test:release` validates the release helpers locally; `npm run test:coverage` generates the Sonar LCOV report.
